@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: naha-railwatch-api
+    runtime: python
+    rootDir: railwatch/backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: RAILWATCH_INGEST_KEY
+        sync: false
+      - key: RAILWATCH_WS_KEY
+        sync: false
+      - key: RAILWATCH_ALLOWED_ORIGINS
+        sync: false
