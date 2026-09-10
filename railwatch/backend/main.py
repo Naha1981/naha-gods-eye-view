@@ -192,11 +192,9 @@ async def ingest_line_breach(
     _: None = Depends(require_ingest_key),
     x_idempotency_key: str | None = Header(default=None),
 ) -> dict[str, Any]:
-    return await _store_and_broadcast(x_idempotency_key or alert.event_id, alert)
+    return await _store_and_broadcast(alert, x_idempotency_key or alert.event_id)
 
 
-# Process-local guard for the public demo route. Replace with Redis/API gateway
-# before production use.
 _rate_window_started = time.monotonic()
 _rate_count = 0
 RATE_LIMIT = int(os.getenv("RAILWATCH_DEMO_RATE_LIMIT_PER_MIN", "30"))
