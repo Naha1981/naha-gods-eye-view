@@ -49,20 +49,23 @@ class TelemetryBreachAlert(BaseModel):
     media_url: str | None = Field(default=None, max_length=500)
 
 
-ALLOWED_ORIGINS = [x.strip() for x in os.getenv("RAILWATCH_ALLOWED_ORIGINS", "http://localhost:5173").split(",") if x.strip()]
+ALLOWED_ORIGINS_RAW = os.getenv("RAILWATCH_ALLOWED_ORIGINS", "http://localhost:5173")
+ALLOW_ALL_ORIGINS = ALLOWED_ORIGINS_RAW.strip() == "*"
+ALLOWED_ORIGINS = [x.strip() for x in ALLOWED_ORIGINS_RAW.split(",") if x.strip() and x.strip() != "*"]
 INGEST_KEY = os.getenv("RAILWATCH_INGEST_KEY", "")
 WS_KEY = os.getenv("RAILWATCH_WS_KEY", INGEST_KEY)
+DEMO_MODE = os.getenv("RAILWATCH_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
 MAX_EVENTS = int(os.getenv("RAILWATCH_MAX_EVENTS", "2000"))
 
 app = FastAPI(
     title="Naha RailWatch Telemetry Engine",
-    version="0.1.0",
+    version="0.2.0",
     description="Authenticated real-time rail telemetry ingestion and command-center broadcasting.",
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"] if ALLOW_ALL_ORIGINS else ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
     allow_headers=["content-type", "x-railwatch-key", "x-idempotency-key"],
@@ -107,52 +110,10 @@ def require_ingest_key(x_railwatch_key: str | None = Header(default=None)) -> No
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
 
-def require_ws_key(websocket: WebSocket) -> None:
-    provided = websocket.query_params.get("token")
-    if not _safe_equal(provided, WS_KEY):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
-
-
-@app.get("/healthz")
-def healthz() -> dict[str, Any]:
-    return {
-        "status": "ok",
-        "service": "railwatch-telemetry",
-        "connections": len(manager.active),
-        "events": len(manager.events),
-    }
-
-
-@app.get("/api/v1/events")
-def recent_events(limit: int = 100) -> list[dict[str, Any]]:
-    limit = max(1, min(limit, 500))
-    return list(manager.events.values())[-limit:]
-
-
-@app.websocket("/ws/v1/c2-stream")
-async def c2_stream(websocket: WebSocket) -> None:
-    token = websocket.query_params.get("token")
-    if not _safe_equal(token, WS_KEY):
-        await websocket.close(code=1008)
-        return
-    await manager.connect(websocket)
-    try:
-        while True:
-            await websocket.receive_text()
-    except WebSocketDisconnect:
-        manager.disconnect(websocket)
-
-
-@app.post("/api/v1/telemetry/line-breach", status_code=status.HTTP_202_ACCEPTED)
-async def ingest_line_breach(
-    alert: TelemetryBreachAlert,
-    _: None = Depends(require_ingest_key),
-    x_idempotency_key: str | None = Header(default=None),
-) -> dict[str, Any]:
-    dedupe_key = x_idempotency_key or alert.event_id
+async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> dict[str, Any]:
     existing = manager.events.get(dedupe_key)
     if existing:
-        return {"status": "duplicate", "event_id": alert.event_id}
+        return {"status": "duplicate", "event_id": alert.event_id, "broadcast_connections": 0}
 
     timestamp = alert.timestamp
     if timestamp.tzinfo is None:
@@ -180,7 +141,7 @@ async def ingest_line_breach(
     }
 
     manager.events[dedupe_key] = payload
-    if len(manager.events) > MAX_EVENTS:
+    while len(manager.events) > MAX_EVENTS:
         oldest = next(iter(manager.events))
         manager.events.pop(oldest, None)
 
@@ -194,18 +155,78 @@ async def ingest_line_breach(
     }
 
 
-# Keep this process-level limiter intentionally small and replace it with Redis
-# or an API gateway before production deployment.
+@app.get("/healthz")
+def healthz() -> dict[str, Any]:
+    return {
+        "status": "ok",
+        "service": "railwatch-telemetry",
+        "connections": len(manager.active),
+        "events": len(manager.events),
+        "demo_mode": DEMO_MODE,
+    }
+
+
+@app.get("/api/v1/events")
+def recent_events(limit: int = 100) -> list[dict[str, Any]]:
+    limit = max(1, min(limit, 500))
+    return list(manager.events.values())[-limit:]
+
+
+@app.websocket("/ws/v1/c2-stream")
+async def c2_stream(websocket: WebSocket) -> None:
+    token = websocket.query_params.get("token")
+    if not DEMO_MODE and not _safe_equal(token, WS_KEY):
+        await websocket.close(code=1008)
+        return
+    await manager.connect(websocket)
+    try:
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
+
+
+@app.post("/api/v1/telemetry/line-breach", status_code=status.HTTP_202_ACCEPTED)
+async def ingest_line_breach(
+    alert: TelemetryBreachAlert,
+    _: None = Depends(require_ingest_key),
+    x_idempotency_key: str | None = Header(default=None),
+) -> dict[str, Any]:
+    return await _store_and_broadcast(x_idempotency_key or alert.event_id, alert)
+
+
+# Process-local guard for the public demo route. Replace with Redis/API gateway
+# before production use.
 _rate_window_started = time.monotonic()
 _rate_count = 0
-RATE_LIMIT = int(os.getenv("RAILWATCH_RATE_LIMIT_PER_MIN", "120"))
+RATE_LIMIT = int(os.getenv("RAILWATCH_DEMO_RATE_LIMIT_PER_MIN", "30"))
 
 
-def rate_guard() -> None:
+def demo_rate_guard() -> None:
     global _rate_window_started, _rate_count
     now = time.monotonic()
     if now - _rate_window_started >= 60:
         _rate_window_started, _rate_count = now, 0
     _rate_count += 1
     if _rate_count > RATE_LIMIT:
-        raise HTTPException(status_code=429, detail="Rate limit exceeded")
+        raise HTTPException(status_code=429, detail="Demo rate limit exceeded")
+
+
+@app.post("/api/v1/demo/line-breach", status_code=status.HTTP_202_ACCEPTED)
+async def demo_line_breach(_: None = Depends(demo_rate_guard)) -> dict[str, Any]:
+    if not DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Demo mode disabled")
+
+    alert = TelemetryBreachAlert(
+        event_id=f"DEMO-{int(time.time() * 1000)}",
+        corridor_code="TFR-COAL-DEMO",
+        segment_name="Ermelo · Richards Bay demonstration sector",
+        km_marker=142.8,
+        coordinates=Coordinates(latitude=-26.5225, longitude=29.9811, elevation_m=1600),
+        alert_type="LINE_BREACH",
+        severity=Severity.CRITICAL,
+        sensor_id="DEMO-SENSOR-01",
+        timestamp=datetime.now(timezone.utc),
+        camera_preset=CameraPreset(pitch=-45, heading=120, range_meters=300),
+    )
+    return await _store_and_broadcast(alert, alert.event_id)
