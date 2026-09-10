@@ -1,6 +1,6 @@
 const params = new URLSearchParams(location.search);
-const apiBase = params.get('api') || 'http://localhost:8000';
-const wsUrl = apiBase.replace(/^http/, 'ws') + '/ws/v1/c2-stream?token=' + encodeURIComponent(params.get('token') || 'demo-change-me');
+const apiBase = (params.get('api') || 'https://naha-railwatch-api.onrender.com').replace(/\/$/, '');
+const wsUrl = apiBase.replace(/^http/, 'ws') + '/ws/v1/c2-stream';
 
 const viewer = new Cesium.Viewer('map', {
   animation: false,
@@ -100,8 +100,12 @@ function connect() {
   };
   ws.onerror = () => ws.close();
   ws.onmessage = event => {
-    const message = JSON.parse(event.data);
-    if (message.action === 'TRIGGER_ALARM') addAlert(message.data);
+    try {
+      const message = JSON.parse(event.data);
+      if (message.action === 'TRIGGER_ALARM') addAlert(message.data);
+    } catch (error) {
+      console.error('RailWatch message error', error);
+    }
   };
 }
 
@@ -116,26 +120,17 @@ async function refreshHealth() {
 }
 
 document.getElementById('demo-alert').addEventListener('click', async () => {
-  const eventId = `DEMO-${Date.now()}`;
-  await fetch(`${apiBase}/api/v1/telemetry/line-breach`, {
-    method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-railwatch-key': params.get('ingest') || 'demo-change-me',
-    },
-    body: JSON.stringify({
-      event_id: eventId,
-      corridor_code: 'DEMO-CORRIDOR',
-      segment_name: 'Ermelo · Richards Bay demo sector',
-      km_marker: 142.8,
-      coordinates: { latitude: -26.5225, longitude: 29.9811, elevation_m: 1600 },
-      alert_type: 'LINE_BREACH',
-      severity: 'CRITICAL',
-      sensor_id: 'DEMO-SENSOR-01',
-      timestamp: new Date().toISOString(),
-      camera_preset: { pitch: -45, heading: 120, range_meters: 300 },
-    }),
-  });
+  const button = document.getElementById('demo-alert');
+  button.disabled = true;
+  try {
+    const res = await fetch(`${apiBase}/api/v1/demo/line-breach`, { method: 'POST' });
+    if (!res.ok) throw new Error(`Demo request failed: ${res.status}`);
+  } catch (error) {
+    console.error(error);
+    wsLabel.textContent = 'DEMO ERROR';
+  } finally {
+    setTimeout(() => { button.disabled = false; }, 1000);
+  }
 });
 
 connect();
