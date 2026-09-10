@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Naha RailWatch Command Center</title>
+  <link rel="stylesheet" href="./style.css" />
+  <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Widgets/widgets.css" />
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Cesium.js"></script>
+</head>
+<body>
+  <div id="map"></div>
+  <header class="topbar">
+    <div>
+      <span class="eyebrow">NAHALABS</span>
+      <h1>RailWatch Command Center</h1>
+      <p>Real-time rail telemetry · incident response · geospatial situational awareness</p>
+    </div>
+    <div class="status"><span id="ws-dot"></span><span id="ws-label">DISCONNECTED</span></div>
+  </header>
+  <aside class="panel" aria-label="RailWatch controls">
+    <div class="panel-title">LIVE OPERATIONS</div>
+    <div class="metric"><span>ACTIVE ALERTS</span><strong id="alert-count">0</strong></div>
+    <div class="metric"><span>SOCKET CLIENTS</span><strong id="client-count">—</strong></div>
+    <button id="demo-alert" type="button">SIMULATE LINE BREACH</button>
+    <p class="hint">Demo coordinates are placeholders. Production feeds should come from authenticated Transnet/partner telemetry.</p>
+  </aside>
+  <section id="alert-feed" class="feed" aria-live="polite"></section>
+  <script src="./app.js"></script>
+</body>
+</html>
