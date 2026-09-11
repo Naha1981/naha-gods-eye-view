@@ -12,7 +12,7 @@
     "url": "https://github.com/bilawalsidhu/gods-eye-view.git"
   },
   "bugs": {
-    "url": "https://github.com/bilawalsidhu/gods-eye-view/issues"
+    "url": "https://github.com/Naha1981/naha-gods-eye-view/issues"
   },
   "engines": {
     "node": ">=24.14.0 <25 || >=26 <27"
@@ -28,7 +28,8 @@
     "test:track": "node scripts/track-regression.mjs",
     "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs",
     "railwatch:smoke": "node scripts/railwatch-smoke.mjs",
-    "railwatch:monitor": "node scripts/railwatch-monitor.mjs"
+    "railwatch:monitor": "node scripts/railwatch-monitor.mjs",
+    "railwatch:monitor:selftest": "node scripts/railwatch-monitor-selftest.mjs"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
