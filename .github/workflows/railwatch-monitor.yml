@@ -39,6 +39,17 @@ jobs:
           EXPECTED_RENDER_COMMIT: ${{ github.sha }}
         run: npm run railwatch:monitor
 
+      - name: Close recovered monitor alert
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          EXISTING=$(gh issue list --state open --search "RailWatch monitor alert in:title" --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "✅ Recovery confirmed by automated monitor on commit $GITHUB_SHA at $(date -u '+%Y-%m-%d %H:%M:%S') UTC."
+            gh issue close "$EXISTING" --reason completed
+          fi
+
       - name: Raise persistent GitHub alert on failure
         if: failure()
         env:
