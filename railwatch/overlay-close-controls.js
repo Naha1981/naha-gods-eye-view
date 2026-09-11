@@ -20,7 +20,7 @@
     addClose(incident, () => incident?.classList.remove('visible'));
 
     const asset = document.querySelector('.asset-operator');
-    addClose(asset, () => asset?.remove());
+    addClose(asset, () => asset?.classList.add('closed'));
 
     const dispatch = document.querySelector('.dispatch-intelligence');
     if (dispatch) {
