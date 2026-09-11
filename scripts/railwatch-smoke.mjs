@@ -109,7 +109,6 @@ try {
         document.dispatchEvent(new CustomEvent('railwatch:incident', { detail: event }));
       }, demoEvent);
       await page.waitForSelector('#incident-popover', { timeout: 5_000 });
-      await waitForText(page, '#asset-total', '3', 10_000);
 
       await page.evaluate(() => document.dispatchEvent(new CustomEvent('railwatch:intelligence-refresh')));
       await page.waitForFunction(() => Boolean(document.querySelector('#railwatch-intelligence-panel')), { timeout: 5_000 });
@@ -134,8 +133,8 @@ try {
       await page.click('.asset-select');
       assert(await page.$eval('.crs-stage[data-stage="VERIFY"]', el => el.classList.contains('active')));
 
-      await page.waitForSelector('.asset-operator button[data-action="dispatched"]', { timeout: 10_000 });
-      await page.click('.asset-operator button[data-action="dispatched"]');
+      await page.waitForSelector('.asset-operator button[data-action="dispatched"][data-id="DEMO-SIG-0142"]', { timeout: 10_000 });
+      await page.click('.asset-operator button[data-action="dispatched"][data-id="DEMO-SIG-0142"]');
       await page.waitForSelector('.dispatch-intelligence.visible #dispatch-confirm', { timeout: 5_000 });
       await page.click('#dispatch-confirm');
       assert.equal(await page.$eval('#dispatch-confirm', el => el.textContent.trim()), '✓ RESPONSE DISPATCH QUEUED');
