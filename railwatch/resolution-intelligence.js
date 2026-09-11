@@ -22,10 +22,17 @@
   root.querySelector('.resolution-close').addEventListener('click', () => root.classList.remove('visible'));
 
   function esc(value) {
-    return String(value ?? '').replace(/[&<>\'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+    return String(value ?? '').replace(/[&<>\'\"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   }
 
-  function buildReportHtml(data, assetName, teamName, stamp) {
+  function emitAudit(action, detail) {
+    document.dispatchEvent(new CustomEvent('railwatch:audit', {
+      detail: { action, detail, source: 'operator-resolution-demo', timestamp: new Date().toISOString() },
+    }));
+  }
+
+  function buildReportHtml(data, assetName, teamName, stamp, closed) {
+    const finalStatus = closed ? 'INCIDENT CLOSED · EVIDENCE PRESERVED' : 'RESPONSE COMPLETE · READY TO CLOSE';
     return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RailWatch Incident Report</title><style>
       body{font-family:Arial,sans-serif;padding:40px;color:#162028;max-width:920px;margin:auto;background:#fff}
       h1{margin-bottom:4px}.meta{color:#66727a;margin-bottom:26px}.box{border:1px solid #d8e0e5;border-radius:8px;padding:16px;margin:12px 0}.ok{color:#167642;font-weight:800}.label{font-size:11px;color:#68757d;font-weight:800;letter-spacing:.08em}.row{margin:10px 0}.footer{margin-top:30px;font-size:12px;color:#68757d}
@@ -36,11 +43,11 @@
       <h1>RailWatch Incident Report</h1>
       <div class="meta">DEMO · NOT AN AUTHORITATIVE TRANSNET RECORD</div>
       <div class="box"><div class="label">INCIDENT</div><div class="row"><b>${esc(data?.alert_type || 'LINE BREACH')}</b> · ${esc(data?.segment || 'Demo sector')} · KM ${Number(data?.km_marker || 0).toFixed(1)}</div><div class="row">Asset: ${esc(assetName)}</div><div class="row">Response unit: ${esc(teamName)}</div></div>
-      <div class="box"><div class="label">STATUS</div><div class="row ok">INCIDENT CLOSED · EVIDENCE PRESERVED</div></div>
+      <div class="box"><div class="label">STATUS</div><div class="row ok">${finalStatus}</div></div>
       <div class="box"><div class="label">EVIDENCE PACKAGE</div><div class="row">Sensor event · Asset record · CCTV demo evidence · Response action · Operator closure</div></div>
       <div class="box"><div class="label">TIMELINE</div><div class="row">Detected → Located → Verified → Dispatched → Resolved → Closed</div><div class="row">Report generated: ${esc(stamp)}</div></div>
       <div class="footer">Prototype report generated locally by NahaLabs RailWatch Command Center.</div>
-      <script>function downloadReport(){const html='${esc('RailWatch Incident Report')}';const doc='<!doctype html>'+document.documentElement.outerHTML.replace(/<script>[\\s\\S]*?<\\/script>/g,'');const blob=new Blob([doc],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='railwatch-incident-report.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}</script>
+      <script>function downloadReport(){const doc='<!doctype html>'+document.documentElement.outerHTML.replace(/<script>[\\s\\S]*?<\\/script>/g,'');const blob=new Blob([doc],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='railwatch-incident-report.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}</script>
     </body></html>`;
   }
 
@@ -50,6 +57,8 @@
     const stamp = now.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     const assetName = asset?.name || 'Selected infrastructure asset';
     const teamName = team?.name || 'Assigned response unit';
+    let closed = false;
+
     body.innerHTML = `
       <section class="resolution-status closed-ready">
         <span>INCIDENT STATUS</span>
@@ -81,21 +90,35 @@
     `;
 
     body.querySelector('#close-incident').addEventListener('click', () => {
-      body.querySelector('.resolution-status').classList.remove('closed-ready');
-      body.querySelector('.resolution-status').classList.add('closed');
-      body.querySelector('.resolution-status strong').textContent = 'INCIDENT CLOSED · EVIDENCE PRESERVED';
+      closed = true;
+      const status = body.querySelector('.resolution-status');
+      status.classList.remove('closed-ready');
+      status.classList.add('closed');
+      status.querySelector('strong').textContent = 'INCIDENT CLOSED · EVIDENCE PRESERVED';
       body.querySelector('.resolution-event:last-child span').textContent = 'Incident closed by operator · evidence package recorded';
-      body.querySelector('#close-incident').textContent = '✓ INCIDENT CLOSED';
-      body.querySelector('#close-incident').disabled = true;
+
+      const button = body.querySelector('#close-incident');
+      button.textContent = '✓ INCIDENT CLOSED';
+      button.disabled = true;
+
+      const proof = document.createElement('div');
+      proof.className = 'resolution-proof-ready';
+      proof.innerHTML = '<strong>PROOF PACKAGE READY</strong><span>Timeline, evidence references and operator closure are recorded for this demo case.</span>';
+      button.insertAdjacentElement('afterend', proof);
+
+      emitAudit('INCIDENT_CLOSED', `${data?.alert_type || 'LINE BREACH'} · ${assetName} · ${teamName}`);
     });
 
     body.querySelector('#view-report').addEventListener('click', () => {
       const report = window.open('', '_blank', 'width=920,height=760');
       if (!report) return;
       report.document.open();
-      report.document.write(buildReportHtml(data, assetName, teamName, stamp));
+      report.document.write(buildReportHtml(data, assetName, teamName, stamp, closed));
       report.document.close();
+      emitAudit('INCIDENT_REPORT_VIEWED', assetName);
     });
+
+    emitAudit('RESOLUTION_OPENED', `${assetName} · ${teamName}`);
   }
 
   window.RailWatchResolution = { openForIncident };
