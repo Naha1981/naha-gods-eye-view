@@ -72,6 +72,19 @@ async function waitForServer(url, timeoutMs = 30_000) {
   throw new Error(`Timed out waiting for ${url}\n${viteOutput}`);
 }
 
+async function waitForText(page, selector, expected, timeoutMs = 10_000) {
+  const deadline = Date.now() + timeoutMs;
+  let observed = '';
+  while (Date.now() < deadline) {
+    try {
+      observed = await page.$eval(selector, element => element.textContent?.trim() || '');
+      if (observed === expected) return;
+    } catch (_) {}
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  throw new Error(`Timed out waiting for ${selector} to equal ${JSON.stringify(expected)}; last observed ${JSON.stringify(observed)}`);
+}
+
 try {
   await waitForServer('http://127.0.0.1:4173/railwatch/');
   const browser = await puppeteer.launch({ headless: 'new', executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || puppeteer.executablePath(), args: ['--no-sandbox', '--disable-setuid-sandbox'] });
@@ -96,7 +109,7 @@ try {
         document.dispatchEvent(new CustomEvent('railwatch:incident', { detail: event }));
       }, demoEvent);
       await page.waitForSelector('#incident-popover', { timeout: 5_000 });
-      await page.waitForFunction(() => document.querySelector('#asset-total')?.textContent?.trim() === '3', { timeout: 5_000 });
+      await waitForText(page, '#asset-total', '3', 10_000);
 
       await page.evaluate(() => document.dispatchEvent(new CustomEvent('railwatch:intelligence-refresh')));
       await page.waitForFunction(() => Boolean(document.querySelector('#railwatch-intelligence-panel')), { timeout: 5_000 });
