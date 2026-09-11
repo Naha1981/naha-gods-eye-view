@@ -75,6 +75,15 @@ jobs:
       - name: Run RailWatch end-to-end smoke
         run: npm run railwatch:smoke
 
+      - name: Upload RailWatch smoke evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: railwatch-smoke-evidence
+          path: artifacts/railwatch-smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 7
+
   windows-onboarding:
     name: Windows onboarding
     runs-on: windows-latest
