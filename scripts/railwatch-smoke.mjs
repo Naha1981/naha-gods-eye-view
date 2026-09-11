@@ -93,8 +93,10 @@ try {
       await page.evaluate((event) => {
         if (typeof window.showIncident !== 'function') throw new Error('showIncident renderer is not available');
         window.showIncident(event);
+        document.dispatchEvent(new CustomEvent('railwatch:incident', { detail: event }));
       }, demoEvent);
       await page.waitForSelector('#incident-popover', { timeout: 5_000 });
+      await page.waitForFunction(() => document.querySelector('#asset-total')?.textContent?.trim() === '3', { timeout: 5_000 });
 
       await page.evaluate(() => document.dispatchEvent(new CustomEvent('railwatch:intelligence-refresh')));
       await page.waitForFunction(() => Boolean(document.querySelector('#railwatch-intelligence-panel')), { timeout: 5_000 });
