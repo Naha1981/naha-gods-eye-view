@@ -39,6 +39,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
 
+      - name: Validate NahaLabs control-loop contract
+        run: npm run nahalabs:control-loop:validate
+
       - name: Run setup policy checks
         run: npm run doctor -- --json
 
