@@ -90,7 +90,6 @@ try {
       const firstAlert = await page.$('.alert');
       assert(firstAlert);
       await firstAlert.click();
-      if (!window.showIncident) {}
       await page.evaluate((event) => {
         if (typeof window.showIncident !== 'function') throw new Error('showIncident renderer is not available');
         window.showIncident(event);
@@ -133,23 +132,21 @@ try {
       assert.equal(await page.$eval('#crs-status', el => el.textContent.trim()), 'CLOSED · EVIDENCE PRESERVED');
       assert(await page.$eval('.crs-stage[data-stage="PROVE"]', el => el.classList.contains('active')));
 
-      await page.evaluate(() => new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Timed out waiting for incident report popup')), 5_000);
-        window.__railwatchReportCaptured = value => { clearTimeout(timer); resolve(value); };
+      await page.evaluate(() => {
         window.__railwatchOriginalOpen = window.open;
+        window.__railwatchCapturedReport = null;
         window.open = function() {
-          return { document: { open() {}, close() {}, write(html) { window.__railwatchReportCaptured(html); } } };
+          return {
+            document: {
+              open() {},
+              close() {},
+              write(html) { window.__railwatchCapturedReport = html; },
+            },
+          };
         };
-      }));
+      });
       await page.click('#view-report');
-      const reportHtml = await page.evaluate(() => new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Timed out capturing report HTML')), 5_000);
-        const check = () => {
-          if (window.__railwatchCapturedReport) { clearTimeout(timer); resolve(window.__railwatchCapturedReport); return; }
-          setTimeout(check, 25);
-        };
-        check();
-      }));
+      const reportHtml = await page.waitForFunction(() => window.__railwatchCapturedReport, { timeout: 5_000 }).then(handle => handle.jsonValue());
       await page.evaluate(() => { if (window.__railwatchOriginalOpen) window.open = window.__railwatchOriginalOpen; });
       assert.match(reportHtml, /Incident Evidence Report/);
       assert.match(reportHtml, /DEMO · NOT AN AUTHORITATIVE TRANSNET RECORD/);
