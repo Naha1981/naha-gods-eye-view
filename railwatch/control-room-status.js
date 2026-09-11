@@ -36,11 +36,15 @@
   const unresolved = root.querySelector('#crs-unresolved');
   const stages = [...root.querySelectorAll('.crs-stage')];
   let hasActiveIncident = false;
+  let currentStage = 'DETECT';
 
   const stageIndex = { DETECT: 0, LOCATE: 1, VERIFY: 2, RESPOND: 3, RESOLVE: 4, PROVE: 5 };
 
-  function updateStage(stage) {
-    const index = stageIndex[stage] ?? 0;
+  function updateStage(stage, allowRegression = false) {
+    if (!(stage in stageIndex)) return;
+    if (!allowRegression && stageIndex[stage] < stageIndex[currentStage]) return;
+    currentStage = stage;
+    const index = stageIndex[stage];
     stages.forEach((el, i) => {
       el.classList.toggle('active', i === index);
       el.classList.toggle('complete', i < index);
