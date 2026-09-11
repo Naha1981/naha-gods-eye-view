@@ -1,0 +1,35 @@
+name: RailWatch Render monitor
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railwatch-monitor
+  cancel-in-progress: true
+
+jobs:
+  health:
+    name: Render health + deployment fingerprint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+
+      - name: Probe Render service
+        env:
+          RAILWATCH_API_URL: https://naha-railwatch-api.onrender.com
+          EXPECTED_RENDER_COMMIT: ${{ github.sha }}
+        run: npm run railwatch:monitor
