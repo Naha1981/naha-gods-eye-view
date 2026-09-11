@@ -80,6 +80,10 @@ INGEST_KEY = os.getenv("RAILWATCH_INGEST_KEY", "")
 WS_KEY = os.getenv("RAILWATCH_WS_KEY", INGEST_KEY)
 DEMO_MODE = os.getenv("RAILWATCH_DEMO_MODE", "false").lower() in {"1", "true", "yes", "on"}
 MAX_EVENTS = int(os.getenv("RAILWATCH_MAX_EVENTS", "2000"))
+BUILD_SHA = os.getenv("RENDER_GIT_COMMIT") or os.getenv("RAILWATCH_BUILD_SHA") or "local"
+BUILD_BRANCH = os.getenv("RENDER_GIT_BRANCH") or os.getenv("RAILWATCH_BUILD_BRANCH") or "local"
+INSTANCE_ID = os.getenv("RENDER_INSTANCE_ID") or "local"
+STARTED_AT = datetime.now(timezone.utc)
 
 app = FastAPI(
     title="Naha RailWatch Telemetry Engine",
@@ -188,6 +192,12 @@ def healthz() -> dict[str, Any]:
         "connections": len(manager.active),
         "events": len(manager.events),
         "demo_mode": DEMO_MODE,
+        "build": {
+            "commit": BUILD_SHA,
+            "branch": BUILD_BRANCH,
+            "instance": INSTANCE_ID,
+            "started_at": STARTED_AT.isoformat(),
+        },
     }
 
 
