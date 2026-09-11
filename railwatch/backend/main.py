@@ -34,6 +34,18 @@ class CameraPreset(BaseModel):
     range_meters: float = Field(default=300, gt=50, le=5000)
 
 
+class IncidentAsset(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    asset_id: str = Field(min_length=2, max_length=80)
+    asset_type: str = Field(min_length=2, max_length=80)
+    name: str = Field(min_length=2, max_length=160)
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+    status: str = Field(min_length=2, max_length=50)
+    condition: str = Field(min_length=2, max_length=180)
+    distance_km: float = Field(ge=0, le=1000)
+
+
 class IncidentContext(BaseModel):
     model_config = ConfigDict(extra="forbid")
     location_name: str = Field(min_length=2, max_length=180)
@@ -41,6 +53,8 @@ class IncidentContext(BaseModel):
     asset_condition: str = Field(min_length=2, max_length=160)
     operational_impact: str = Field(min_length=2, max_length=240)
     recommended_action: str = Field(min_length=2, max_length=240)
+    assets: list[IncidentAsset] = Field(default_factory=list)
+    data_classification: str = Field(default="DEMO · NOT AUTHORITATIVE GIS", max_length=120)
 
 
 class TelemetryBreachAlert(BaseModel):
@@ -69,7 +83,7 @@ MAX_EVENTS = int(os.getenv("RAILWATCH_MAX_EVENTS", "2000"))
 
 app = FastAPI(
     title="Naha RailWatch Telemetry Engine",
-    version="0.3.0",
+    version="0.4.0",
     description="Authenticated real-time rail telemetry ingestion and command-center broadcasting.",
 )
 
@@ -132,7 +146,7 @@ async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> 
 
     payload = {
         "action": "TRIGGER_ALARM",
-        "schema_version": "1.1",
+        "schema_version": "1.2",
         "data": {
             "event_id": alert.event_id,
             "corridor": alert.corridor_code,
@@ -226,12 +240,49 @@ async def demo_line_breach(_: None = Depends(demo_rate_guard)) -> dict[str, Any]
     if not DEMO_MODE:
         raise HTTPException(status_code=404, detail="Demo mode disabled")
 
+    # These are deliberately labelled demo assets. They are placeholders for later
+    # integration with authoritative GIS / Transnet infrastructure datasets.
+    lat = -26.5225
+    lon = 29.9811
+    demo_assets = [
+        IncidentAsset(
+            asset_id="DEMO-SIG-0142",
+            asset_type="SIGNALLING",
+            name="Demo block signal / control point",
+            latitude=lat + 0.0020,
+            longitude=lon - 0.0030,
+            status="ALERT",
+            condition="Potential interference / inspection required",
+            distance_km=0.39,
+        ),
+        IncidentAsset(
+            asset_id="DEMO-PT-0142",
+            asset_type="TRACK ASSET",
+            name="Demo turnout / permanent-way section",
+            latitude=lat - 0.0014,
+            longitude=lon + 0.0024,
+            status="MONITOR",
+            condition="Within incident zone; field verification required",
+            distance_km=0.30,
+        ),
+        IncidentAsset(
+            asset_id="DEMO-TRL-0142",
+            asset_type="TELECOMMUNICATIONS",
+            name="Demo wayside telemetry cabinet",
+            latitude=lat + 0.0008,
+            longitude=lon + 0.0037,
+            status="UNKNOWN",
+            condition="No current health confirmation",
+            distance_km=0.41,
+        ),
+    ]
+
     alert = TelemetryBreachAlert(
         event_id=f"DEMO-{int(time.time() * 1000)}",
         corridor_code="TFR-COAL-DEMO",
         segment_name="Ermelo · Richards Bay demonstration sector",
         km_marker=142.8,
-        coordinates=Coordinates(latitude=-26.5225, longitude=29.9811, elevation_m=1600),
+        coordinates=Coordinates(latitude=lat, longitude=lon, elevation_m=1600),
         alert_type="LINE_BREACH",
         severity=Severity.CRITICAL,
         sensor_id="DEMO-SENSOR-01",
@@ -239,10 +290,11 @@ async def demo_line_breach(_: None = Depends(demo_rate_guard)) -> dict[str, Any]
         camera_preset=CameraPreset(pitch=-48, heading=35, range_meters=420),
         incident=IncidentContext(
             location_name="Ermelo–Richards Bay Coal Line · Demo Sector",
-            asset_type="Trackside signalling / cable infrastructure",
+            asset_type="Rail infrastructure / wayside equipment",
             asset_condition="Possible tampering or physical damage detected",
             operational_impact="Potential line interruption; train movement should be verified before dispatch",
             recommended_action="Dispatch nearest response team and verify track status via field crew / CCTV",
+            assets=demo_assets,
         ),
     )
     return await _store_and_broadcast(alert, alert.event_id)
