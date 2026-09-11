@@ -30,10 +30,6 @@
     return String(value ?? '').replace(/[&<>\'\"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   }
 
-  function statusFor(item) {
-    return item.closed ? 'CLOSED' : 'ACTIVE';
-  }
-
   function render() {
     count.textContent = `${cases.length} ${cases.length === 1 ? 'CASE' : 'CASES'}`;
     if (!cases.length) {
@@ -44,7 +40,7 @@
       <button class="incident-history-row" type="button" data-index="${index}">
         <div class="incident-history-row-top">
           <strong>${esc(item.alert)}</strong>
-          <span class="incident-history-status ${item.closed ? 'closed' : 'active'}">${statusFor(item)}</span>
+          <span class="incident-history-status ${item.closed ? 'closed' : 'active'}">${item.closed ? 'CLOSED' : 'ACTIVE'}</span>
         </div>
         <div class="incident-history-location">${esc(item.segment)} · KM ${esc(item.km)}</div>
         <div class="incident-history-meta">${esc(item.assetCount)} assets · ${esc(item.time)}</div>
@@ -53,8 +49,9 @@
   }
 
   function record(data) {
+    const eventId = data?.event_id || `demo-${Date.now()}`;
     const item = {
-      eventId: data?.event_id || `demo-${Date.now()}`,
+      eventId,
       alert: String(data?.alert_type || 'LINE BREACH').replace(/_/g, ' '),
       segment: data?.segment || 'Demo sector',
       km: Number(data?.km_marker || 0).toFixed(1),
@@ -63,7 +60,7 @@
       closed: false,
       data,
     };
-    const existing = cases.findIndex(item => item.eventId === item.eventId);
+    const existing = cases.findIndex(entry => entry.eventId === eventId);
     if (existing >= 0) cases.splice(existing, 1);
     cases.unshift(item);
     if (cases.length > 12) cases.length = 12;
@@ -72,19 +69,16 @@
 
   function markClosed(eventId) {
     const item = cases.find(entry => entry.eventId === eventId);
-    if (item) {
-      item.closed = true;
-      render();
-    }
+    if (!item) return;
+    item.closed = true;
+    render();
   }
 
-  function showDetail(item) {
-    if (!item?.data) return;
-    window.RailWatchControlRoom?.ingest?.(item.data);
-    document.dispatchEvent(new CustomEvent('railwatch:history-selected', { detail: item.data }));
-  }
-
-  root.querySelector('.incident-history-close').addEventListener('click', () => root.classList.remove('visible'));
+  root.querySelector('.incident-history-close').addEventListener('click', () => {
+    root.classList.remove('visible');
+    open = false;
+    toggle.textContent = 'SHOW HISTORY';
+  });
   toggle.addEventListener('click', () => {
     open = !open;
     root.classList.toggle('visible', open);
@@ -93,11 +87,34 @@
   list.addEventListener('click', event => {
     const row = event.target.closest('[data-index]');
     if (!row) return;
-    showDetail(cases[Number(row.dataset.index)]);
+    const item = cases[Number(row.dataset.index)];
+    if (!item?.data) return;
+    document.dispatchEvent(new CustomEvent('railwatch:history-selected', { detail: item.data }));
   });
 
-  document.addEventListener('railwatch:incident', event => record(event.detail));
-  document.addEventListener('railwatch:incident-closed', event => markClosed(event.detail?.eventId));
+  const api = window.RailWatchControlRoom;
+  if (api?.ingest) {
+    const originalIngest = api.ingest;
+    api.ingest = data => {
+      originalIngest(data);
+      record(data);
+    };
+  }
 
+  const resolution = window.RailWatchResolution;
+  if (resolution?.openForIncident) {
+    const originalOpen = resolution.openForIncident;
+    resolution.openForIncident = (data, asset, team) => {
+      originalOpen(data, asset, team);
+      setTimeout(() => {
+        const button = document.getElementById('close-incident');
+        if (!button || button.dataset.historyWired) return;
+        button.dataset.historyWired = 'true';
+        button.addEventListener('click', () => markClosed(data?.event_id));
+      }, 0);
+    };
+  }
+
+  render();
   window.RailWatchHistory = { record, markClosed, show: () => { open = true; root.classList.add('visible'); toggle.textContent = 'HIDE HISTORY'; } };
 })();
