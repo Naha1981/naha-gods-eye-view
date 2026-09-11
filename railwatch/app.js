@@ -32,6 +32,54 @@ const wsDot = document.getElementById('ws-dot');
 const wsLabel = document.getElementById('ws-label');
 const incidentPopover = document.getElementById('incident-popover');
 const activeIds = new Set();
+const corridorEntities = [];
+
+// Schematic corridor layer based on Transnet's published corridor structure.
+// Coordinates are deliberately schematic for the prototype, not an authoritative track GIS dataset.
+const corridorRoutes = [
+  { name: 'NORTHCOR', points: [[-26.52,29.99],[-26.15,29.98],[-25.70,30.10],[-25.40,30.20],[-28.00,32.05],[-28.78,32.04]], width: 5 },
+  { name: 'NORTHEASTCOR', points: [[-22.36,29.33],[-23.90,29.45],[-25.00,30.38],[-26.15,28.99],[-25.94,29.60],[-28.78,32.04]], width: 4 },
+  { name: 'CENTRALCOR', points: [[-26.20,28.05],[-26.95,27.10],[-27.38,26.65],[-27.90,25.86],[-28.70,25.53]], width: 4 },
+  { name: 'CONTAINERCOR', points: [[-26.20,28.05],[-26.55,27.95],[-27.55,28.05],[-28.50,29.00],[-29.86,30.98]], width: 6 },
+  { name: 'CAPECOR', points: [[-27.20,25.20],[-29.12,26.22],[-29.62,25.47],[-31.90,26.90],[-33.92,18.42],[-33.96,25.60]], width: 4 },
+  { name: 'ORECOR', points: [[-28.70,21.25],[-29.60,22.74],[-30.65,24.20],[-31.92,25.00],[-32.10,25.64]], width: 7 },
+];
+
+function buildCorridorLayer() {
+  corridorRoutes.forEach(route => {
+    const positions = route.points.map(([lat, lon]) => Cesium.Cartesian3.fromDegrees(lon, lat, 55));
+    const line = viewer.entities.add({
+      id: `corridor-${route.name}`,
+      polyline: {
+        positions,
+        width: route.width,
+        material: Cesium.Color.fromAlpha(Cesium.Color.LIME, 0.58),
+        clampToGround: true,
+      },
+    });
+    line.railwatchCorridor = route.name;
+    corridorEntities.push(line);
+
+    const mid = route.points[Math.floor(route.points.length / 2)];
+    const label = viewer.entities.add({
+      id: `corridor-label-${route.name}`,
+      position: Cesium.Cartesian3.fromDegrees(mid[1], mid[0], 120),
+      label: {
+        text: route.name,
+        font: '800 11px ui-monospace, SFMono-Regular, Menlo, monospace',
+        fillColor: Cesium.Color.WHITE,
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.62),
+        pixelOffset: new Cesium.Cartesian2(0, -6),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+    label.railwatchCorridor = route.name;
+    corridorEntities.push(label);
+  });
+}
+
+buildCorridorLayer();
 
 function addAlert(data) {
   const [lat, lon] = data.location;
@@ -69,7 +117,6 @@ function addAlert(data) {
   });
   hazardEntity.railwatchData = data;
 
-  // Concentric warning rings make the breach readable at a glance.
   [70, 130, 210].forEach((radius, index) => {
     const ring = viewer.entities.add({
       id: `${data.event_id}-ring-${index + 1}`,
@@ -88,7 +135,6 @@ function addAlert(data) {
     ring.railwatchData = data;
   });
 
-  // Put the camera above the incident and explicitly look at the breach center.
   const center = Cesium.BoundingSphere.fromPoints([
     hazardPosition,
     Cesium.Cartesian3.fromDegrees(lon, lat, elevation + 20),
@@ -140,7 +186,7 @@ function hideIncident() {
 }
 
 function escapeHtml(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, ch => ({
+  return String(value ?? '').replace(/[&<>'\"]/g, ch => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
   }[ch]));
 }
