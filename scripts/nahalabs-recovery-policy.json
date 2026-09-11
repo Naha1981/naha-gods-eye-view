@@ -1,0 +1,27 @@
+{
+  "schema_version": "1.0",
+  "name": "NahaLabs Safe Recovery Policy",
+  "principle": "Recover transient failures automatically; escalate persistent failures visibly.",
+  "defaults": {
+    "health_attempts": 3,
+    "retry_delays_ms": [1000, 3000],
+    "deployment_verification_attempts": 36,
+    "deployment_verification_delay_ms": 20000,
+    "production_smoke_attempts": 2
+  },
+  "allowed_automatic_recovery": [
+    "retry transient network errors",
+    "retry HTTP health failures",
+    "allow Render cold start to complete",
+    "repeat production read-only smoke checks once"
+  ],
+  "forbidden_automatic_actions": [
+    "modify production data",
+    "send real field dispatches",
+    "change secrets",
+    "change deployment configuration",
+    "retry indefinitely",
+    "hide a persistent failure"
+  ],
+  "escalation": "Create or update a persistent GitHub alert after bounded recovery attempts are exhausted."
+}
