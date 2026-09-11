@@ -153,7 +153,9 @@ try {
       await page.click('#demo-alert');
       await page.waitForSelector('.alert', { timeout: 10_000 });
 
-      await page.locator('.alert').first().hover();
+      const firstAlert = await page.$('.alert');
+      assert(firstAlert, 'Expected at least one alert element');
+      await firstAlert.hover();
       await page.waitForSelector('[data-acknowledge-incident]', { timeout: 5_000 });
       assert.match(await page.$eval('#crs-status', el => el.textContent), /ACTIVE/);
 
