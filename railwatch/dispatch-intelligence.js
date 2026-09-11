@@ -29,7 +29,7 @@
   ];
 
   function esc(value) {
-    return String(value ?? '').replace(/[&<>\'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
+    return String(value ?? '').replace(/[&<>\'\"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   }
 
   function chooseTeam(asset) {
@@ -92,14 +92,30 @@
       `;
 
       body.querySelector('#dispatch-confirm').addEventListener('click', () => {
-        body.querySelector('#dispatch-confirm').textContent = '✓ RESPONSE DISPATCH QUEUED';
-        body.querySelector('#dispatch-confirm').classList.add('queued');
-        body.querySelector('.dispatch-footnote').textContent = 'Demo action recorded locally. In production this would create an authenticated dispatch task and audit record.';
+        const button = body.querySelector('#dispatch-confirm');
+        button.textContent = '✓ RESPONSE DISPATCH QUEUED';
+        button.classList.add('queued');
+        body.querySelector('.dispatch-footnote').textContent = 'Demo action recorded locally. Next step: complete the response and close the incident.';
+
+        if (!body.querySelector('#dispatch-complete')) {
+          const complete = document.createElement('button');
+          complete.id = 'dispatch-complete';
+          complete.type = 'button';
+          complete.className = 'dispatch-secondary dispatch-complete';
+          complete.textContent = 'COMPLETE RESPONSE → CLOSE INCIDENT';
+          complete.addEventListener('click', () => {
+            if (window.RailWatchResolution?.openForIncident) {
+              window.RailWatchResolution.openForIncident(data, asset, team);
+            }
+          });
+          button.insertAdjacentElement('afterend', complete);
+        }
       });
 
       body.querySelector('#dispatch-reassign').addEventListener('click', () => {
-        body.querySelector('.dispatch-team-card h3').textContent = teams[(teams.indexOf(team) + 1) % teams.length].name;
-        body.querySelector('.dispatch-team-type').textContent = teams[(teams.indexOf(team) + 1) % teams.length].type;
+        const next = teams[(teams.indexOf(team) + 1) % teams.length];
+        body.querySelector('.dispatch-team-card h3').textContent = next.name;
+        body.querySelector('.dispatch-team-type').textContent = next.type;
       });
     } catch (error) {
       body.innerHTML = `<div class="dispatch-empty">Unable to calculate the demo response.<br/><small>${esc(error.message)}</small></div>`;
