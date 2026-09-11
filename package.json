@@ -30,7 +30,8 @@
     "railwatch:smoke": "node scripts/railwatch-smoke.mjs",
     "railwatch:monitor": "node scripts/railwatch-monitor.mjs",
     "railwatch:monitor:selftest": "node scripts/railwatch-monitor-selftest.mjs",
-    "railwatch:production-smoke": "node scripts/railwatch-production-smoke.mjs"
+    "railwatch:production-smoke": "node scripts/railwatch-production-smoke.mjs",
+    "nahalabs:control-loop:validate": "node scripts/validate-nahalabs-control-loop.mjs"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
