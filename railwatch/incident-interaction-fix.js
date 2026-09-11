@@ -3,10 +3,6 @@
   const apiBase = (new URLSearchParams(location.search).get('api') || 'https://naha-railwatch-api.onrender.com').replace(/\/$/, '');
   if (!feed) return;
 
-  function escape(value) {
-    return String(value ?? '').replace(/[&<>\'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
-  }
-
   function wireAlertCards() {
     feed.querySelectorAll('.alert').forEach(row => {
       row.style.cursor = 'pointer';
@@ -54,11 +50,6 @@
   const observer = new MutationObserver(() => wireAlertCards());
   observer.observe(feed, { childList: true, subtree: true });
   wireAlertCards();
-
-  document.addEventListener('railwatch:incident', () => {
-    setTimeout(hydrateHistory, 250);
-    setTimeout(hydrateHistory, 900);
-  });
-
   hydrateHistory();
+  setInterval(hydrateHistory, 1500);
 })();
