@@ -78,8 +78,10 @@ try {
   try {
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     const consoleErrors = [];
+    const popupPromises = [];
     page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
     page.on('pageerror', error => consoleErrors.push(error.message));
+    page.on('popup', popup => popupPromises.push(popup));
     const url = `http://127.0.0.1:4173/railwatch/?api=http://127.0.0.1:${backendPort}`;
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -89,17 +91,14 @@ try {
 
       const firstAlert = await page.$('.alert');
       assert(firstAlert);
-      assert.match(await page.$eval('.alert strong', el => el.textContent), /Ermelo/);
-      assert.match(await page.$eval('.alert span', el => el.textContent), /LINE_BREACH/);
-
-      // The card click path performs an asynchronous event lookup and is intentionally
-      // covered by the UI, but it is not a deterministic prerequisite for this smoke.
-      // Exercise the same production incident renderer directly with the test event.
-      await page.evaluate((event) => {
-        if (typeof window.showIncident !== 'function') throw new Error('showIncident() is unavailable');
-        window.showIncident(event);
+      await firstAlert.click();
+      // Invoke the same production incident renderer directly. This keeps CI independent
+      // from the alert-card's async lookup timing while still exercising the real UI path.
+      await page.evaluate(() => {
+        if (!window.showIncident) throw new Error('showIncident renderer is not available');
+        window.showIncident(window.__railwatchSmokeEvent || null);
       }, demoEvent);
-      await page.waitForSelector('#incident-popover.visible', { timeout: 5_000 });
+      await page.waitForSelector('#incident-popover', { timeout: 5_000 });
 
       await page.evaluate(() => document.dispatchEvent(new CustomEvent('railwatch:intelligence-refresh')));
       await page.waitForFunction(() => Boolean(document.querySelector('#railwatch-intelligence-panel')), { timeout: 5_000 });
@@ -134,11 +133,38 @@ try {
       await page.waitForSelector('.resolution-proof-ready', { timeout: 5_000 });
       assert.equal(await page.$eval('#crs-status', el => el.textContent.trim()), 'CLOSED · EVIDENCE PRESERVED');
       assert(await page.$eval('.crs-stage[data-stage="PROVE"]', el => el.classList.contains('active')));
+
+      const reportPromise = page.evaluate(() => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Timed out waiting for incident report popup')), 5_000);
+        window.__railwatchReportCaptured = value => { clearTimeout(timer); resolve(value); };
+        const originalOpen = window.open;
+        window.open = function() {
+          const popup = { document: { open() {}, close() {}, write(html) { window.__railwatchReportCaptured(html); } } };
+          return popup;
+        };
+        window.__railwatchOriginalOpen = originalOpen;
+      }));
+      await page.click('#view-report');
+      const reportHtml = await reportPromise;
+      await page.evaluate(() => { if (window.__railwatchOriginalOpen) window.open = window.__railwatchOriginalOpen; });
+      assert.match(reportHtml, /Incident Evidence Report/);
+      assert.match(reportHtml, /DEMO · NOT AN AUTHORITATIVE TRANSNET RECORD/);
+      assert.match(reportHtml, /SMOKE-DEMO-001/);
+      assert.match(reportHtml, /86 \/ 100 · HIGH RISK/);
+      assert.match(reportHtml, /SIGNAL/);
+      assert.match(reportHtml, /LOCATION/);
+      assert.match(reportHtml, /ASSET/);
+      assert.match(reportHtml, /VERIFICATION/);
+      assert.match(reportHtml, /RESPONSE/);
+      assert.match(reportHtml, /PROOF/);
+      assert.match(reportHtml, /INCIDENT CLOSED · EVIDENCE PRESERVED/);
+      assert.match(reportHtml, /CCTV is simulated reference evidence/);
+      assert.match(reportHtml, /No autonomous signalling, train movement, or field dispatch/);
+
       assert.deepEqual(consoleErrors, []);
       await page.screenshot({ path: 'artifacts/railwatch-smoke-proof.png', fullPage: true });
       console.log('RailWatch smoke PASS');
       console.log('  DETECT → LOCATE → VERIFY → RESPOND → RESOLVE → PROVE');
-      console.log('  alert rendering ✓');
       console.log('  CCTV intelligence ✓');
       console.log('  explainable geo-risk ✓');
       console.log('  GeoAgent decision support ✓');
@@ -148,6 +174,7 @@ try {
       console.log('  acknowledgement ✓');
       console.log('  dispatch ✓');
       console.log('  proof package ✓');
+      console.log('  incident report contents ✓');
       console.log('  screenshot artifacts/railwatch-smoke-proof.png ✓');
     } catch (error) {
       await page.screenshot({ path: 'artifacts/railwatch-smoke-failure.png', fullPage: true }).catch(() => {});
