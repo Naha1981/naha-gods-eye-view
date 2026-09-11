@@ -128,7 +128,7 @@ try {
       await page.waitForSelector('[data-acknowledge-incident]', { timeout: 5_000 });
       assert.match(await page.$eval('#crs-status', el => el.textContent), /ACTIVE/);
       await page.click('[data-acknowledge-incident]');
-      assert(await page.$eval('.crs-stage[data-stage="LOCATE"]', el => el.classList.contains('active')));
+      await page.waitForFunction(() => document.querySelector('.crs-stage[data-stage="LOCATE"]')?.classList.contains('active'), { timeout: 5_000 });
       await page.click('.asset-select');
       assert(await page.$eval('.crs-stage[data-stage="VERIFY"]', el => el.classList.contains('active')));
 
