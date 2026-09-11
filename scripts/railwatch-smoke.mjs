@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { spawn } from 'node:child_process';
 import { once } from 'node:events';
+import { mkdir } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 import { WebSocketServer } from 'ws';
 import puppeteer from 'puppeteer';
 
@@ -58,6 +59,7 @@ const demoEvent = {
   },
 };
 
+await mkdir('artifacts', { recursive: true });
 const wsPayload = JSON.stringify({ action: 'TRIGGER_ALARM', schema_version: '1.2', data: demoEvent });
 
 const backend = createServer((req, res) => {
@@ -143,42 +145,50 @@ try {
     page.on('pageerror', error => consoleErrors.push(error.message));
 
     const url = `http://127.0.0.1:4173/railwatch/?api=http://127.0.0.1:${backendPort}`;
-    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-    await page.waitForSelector('#demo-alert', { timeout: 15_000 });
-    await page.click('#demo-alert');
-    await page.waitForSelector('.alert', { timeout: 10_000 });
+    try {
+      await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
 
-    await page.locator('.alert').first().hover();
-    await page.waitForSelector('[data-acknowledge-incident]', { timeout: 5_000 });
-    assert.match(await page.$eval('#crs-status', el => el.textContent), /ACTIVE/);
+      await page.waitForSelector('#demo-alert', { timeout: 15_000 });
+      await page.click('#demo-alert');
+      await page.waitForSelector('.alert', { timeout: 10_000 });
 
-    await page.click('[data-acknowledge-incident]');
-    assert.equal(await page.$eval('[data-acknowledge-incident]', el => el.textContent.trim()), '✓ INCIDENT ACKNOWLEDGED');
-    assert(await page.$eval('.crs-stage[data-stage="LOCATE"]', el => el.classList.contains('active')));
+      await page.locator('.alert').first().hover();
+      await page.waitForSelector('[data-acknowledge-incident]', { timeout: 5_000 });
+      assert.match(await page.$eval('#crs-status', el => el.textContent), /ACTIVE/);
 
-    await page.click('.asset-select');
-    assert(await page.$eval('.crs-stage[data-stage="VERIFY"]', el => el.classList.contains('active')));
+      await page.click('[data-acknowledge-incident]');
+      assert.equal(await page.$eval('[data-acknowledge-incident]', el => el.textContent.trim()), '✓ INCIDENT ACKNOWLEDGED');
+      assert(await page.$eval('.crs-stage[data-stage="LOCATE"]', el => el.classList.contains('active')));
 
-    await page.click('.asset-operator button[data-action="dispatched"]');
-    await page.waitForSelector('.dispatch-intelligence.visible #dispatch-confirm', { timeout: 5_000 });
-    await page.click('#dispatch-confirm');
-    assert.equal(await page.$eval('#dispatch-confirm', el => el.textContent.trim()), '✓ RESPONSE DISPATCH QUEUED');
-    assert(await page.$eval('.crs-stage[data-stage="RESOLVE"]', el => el.classList.contains('active')));
+      await page.click('.asset-select');
+      assert(await page.$eval('.crs-stage[data-stage="VERIFY"]', el => el.classList.contains('active')));
 
-    await page.click('#dispatch-complete');
-    await page.waitForSelector('.resolution-intelligence.visible #close-incident', { timeout: 5_000 });
-    await page.click('#close-incident');
-    await page.waitForSelector('.resolution-proof-ready', { timeout: 5_000 });
-    assert.equal(await page.$eval('#crs-status', el => el.textContent.trim()), 'CLOSED · EVIDENCE PRESERVED');
-    assert(await page.$eval('.crs-stage[data-stage="PROVE"]', el => el.classList.contains('active')));
+      await page.click('.asset-operator button[data-action="dispatched"]');
+      await page.waitForSelector('.dispatch-intelligence.visible #dispatch-confirm', { timeout: 5_000 });
+      await page.click('#dispatch-confirm');
+      assert.equal(await page.$eval('#dispatch-confirm', el => el.textContent.trim()), '✓ RESPONSE DISPATCH QUEUED');
+      assert(await page.$eval('.crs-stage[data-stage="RESOLVE"]', el => el.classList.contains('active')));
 
-    assert.deepEqual(consoleErrors, []);
-    console.log('RailWatch smoke PASS');
-    console.log('  DETECT → LOCATE → VERIFY → RESPOND → RESOLVE → PROVE');
-    console.log('  acknowledgement ✓');
-    console.log('  dispatch ✓');
-    console.log('  proof package ✓');
+      await page.click('#dispatch-complete');
+      await page.waitForSelector('.resolution-intelligence.visible #close-incident', { timeout: 5_000 });
+      await page.click('#close-incident');
+      await page.waitForSelector('.resolution-proof-ready', { timeout: 5_000 });
+      assert.equal(await page.$eval('#crs-status', el => el.textContent.trim()), 'CLOSED · EVIDENCE PRESERVED');
+      assert(await page.$eval('.crs-stage[data-stage="PROVE"]', el => el.classList.contains('active')));
+
+      assert.deepEqual(consoleErrors, []);
+      await page.screenshot({ path: 'artifacts/railwatch-smoke-proof.png', fullPage: true });
+      console.log('RailWatch smoke PASS');
+      console.log('  DETECT → LOCATE → VERIFY → RESPOND → RESOLVE → PROVE');
+      console.log('  acknowledgement ✓');
+      console.log('  dispatch ✓');
+      console.log('  proof package ✓');
+      console.log('  screenshot artifacts/railwatch-smoke-proof.png ✓');
+    } catch (error) {
+      await page.screenshot({ path: 'artifacts/railwatch-smoke-failure.png', fullPage: true }).catch(() => {});
+      throw error;
+    }
   } finally {
     await browser.close();
   }
