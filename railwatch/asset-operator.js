@@ -172,6 +172,8 @@ listEl.addEventListener('click', event => {
   if (button.dataset.action === 'dispatched') setAction(asset, 'dispatched');
 });
 
+document.addEventListener('railwatch:incident', event => ingest(event.detail));
+
 async function hydrateRecentEvent() {
   try {
     const response = await fetch(`${assetApiBase}/api/v1/events?limit=1`);
