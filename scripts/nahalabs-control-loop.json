@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "name": "NahaLabs Engineering Control Loop",
+  "principle": "Change code → automate verification → deploy → verify deployment → alert on failure.",
+  "service": {
+    "name": "RailWatch Telemetry Engine",
+    "health_url": "https://naha-railwatch-api.onrender.com/healthz",
+    "production_api_url": "https://naha-railwatch-api.onrender.com"
+  },
+  "verification": {
+    "local_smoke": "npm run railwatch:smoke",
+    "monitor": "npm run railwatch:monitor",
+    "monitor_selftest": "npm run railwatch:monitor:selftest",
+    "production_smoke": "npm run railwatch:production-smoke",
+    "deployment_workflow": ".github/workflows/railwatch-deploy-verify.yml",
+    "health_workflow": ".github/workflows/railwatch-monitor.yml"
+  },
+  "evidence": {
+    "browser_artifacts": "artifacts/railwatch-smoke-*.png",
+    "failure_alert": "GitHub Issue: RailWatch monitor alert",
+    "deployment_alert": "GitHub Issue: RailWatch deployment verification alert"
+  },
+  "rules": [
+    "Never claim production health without a successful health contract check.",
+    "Never claim deployment success without matching the expected Git commit.",
+    "Every automated monitor must have a synthetic failure self-test.",
+    "Every browser smoke failure must preserve visual evidence when possible.",
+    "Keep demo traffic isolated from real telemetry and field systems.",
+    "Prefer free or open tooling before introducing paid infrastructure."
+  ]
+}
