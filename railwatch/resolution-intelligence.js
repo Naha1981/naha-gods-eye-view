@@ -25,10 +25,29 @@
     return String(value ?? '').replace(/[&<>\'"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
   }
 
+  function buildReportHtml(data, assetName, teamName, stamp) {
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>RailWatch Incident Report</title><style>
+      body{font-family:Arial,sans-serif;padding:40px;color:#162028;max-width:920px;margin:auto;background:#fff}
+      h1{margin-bottom:4px}.meta{color:#66727a;margin-bottom:26px}.box{border:1px solid #d8e0e5;border-radius:8px;padding:16px;margin:12px 0}.ok{color:#167642;font-weight:800}.label{font-size:11px;color:#68757d;font-weight:800;letter-spacing:.08em}.row{margin:10px 0}.footer{margin-top:30px;font-size:12px;color:#68757d}
+      .report-actions{display:flex;gap:10px;margin:0 0 24px;padding:12px;background:#f3f6f8;border:1px solid #d8e0e5;border-radius:8px}.report-actions button{border:1px solid #b9c7cf;background:#162028;color:#fff;border-radius:6px;padding:10px 14px;font-weight:800;cursor:pointer}.report-actions button.secondary{background:#fff;color:#162028}
+      @media print{body{padding:0}.report-actions{display:none}.box{break-inside:avoid}}
+    </style></head><body>
+      <div class="report-actions"><button onclick="window.print()">PRINT REPORT</button><button class="secondary" onclick="downloadReport()">SAVE / DOWNLOAD REPORT</button></div>
+      <h1>RailWatch Incident Report</h1>
+      <div class="meta">DEMO · NOT AN AUTHORITATIVE TRANSNET RECORD</div>
+      <div class="box"><div class="label">INCIDENT</div><div class="row"><b>${esc(data?.alert_type || 'LINE BREACH')}</b> · ${esc(data?.segment || 'Demo sector')} · KM ${Number(data?.km_marker || 0).toFixed(1)}</div><div class="row">Asset: ${esc(assetName)}</div><div class="row">Response unit: ${esc(teamName)}</div></div>
+      <div class="box"><div class="label">STATUS</div><div class="row ok">INCIDENT CLOSED · EVIDENCE PRESERVED</div></div>
+      <div class="box"><div class="label">EVIDENCE PACKAGE</div><div class="row">Sensor event · Asset record · CCTV demo evidence · Response action · Operator closure</div></div>
+      <div class="box"><div class="label">TIMELINE</div><div class="row">Detected → Located → Verified → Dispatched → Resolved → Closed</div><div class="row">Report generated: ${esc(stamp)}</div></div>
+      <div class="footer">Prototype report generated locally by NahaLabs RailWatch Command Center.</div>
+      <script>function downloadReport(){const html='${esc('RailWatch Incident Report')}';const doc='<!doctype html>'+document.documentElement.outerHTML.replace(/<script>[\\s\\S]*?<\\/script>/g,'');const blob=new Blob([doc],{type:'text/html;charset=utf-8'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='railwatch-incident-report.html';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}</script>
+    </body></html>`;
+  }
+
   function openForIncident(data, asset, team) {
     root.classList.add('visible');
     const now = new Date();
-    const stamp = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const stamp = now.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
     const assetName = asset?.name || 'Selected infrastructure asset';
     const teamName = team?.name || 'Assigned response unit';
     body.innerHTML = `
@@ -44,7 +63,7 @@
       </section>
       <section class="resolution-timeline">
         <div class="resolution-section-label">RESPONSE TIMELINE</div>
-        <div class="resolution-event"><b>DETECTED</b><span>Line-breach signal received · ${stamp}</span></div>
+        <div class="resolution-event"><b>DETECTED</b><span>Line-breach signal received · ${esc(stamp)}</span></div>
         <div class="resolution-event"><b>LOCATED</b><span>Incident positioned at KM ${Number(data?.km_marker || 0).toFixed(1)}</span></div>
         <div class="resolution-event"><b>VERIFIED</b><span>Asset reviewed via demo evidence workflow</span></div>
         <div class="resolution-event"><b>DISPATCHED</b><span>${esc(teamName)} response queued</span></div>
@@ -73,7 +92,8 @@
     body.querySelector('#view-report').addEventListener('click', () => {
       const report = window.open('', '_blank', 'width=920,height=760');
       if (!report) return;
-      report.document.write(`<!doctype html><html><head><title>RailWatch Incident Report</title><style>body{font-family:Arial,sans-serif;padding:40px;color:#162028}h1{margin-bottom:4px}.meta{color:#66727a;margin-bottom:26px}.box{border:1px solid #d8e0e5;border-radius:8px;padding:16px;margin:12px 0}.ok{color:#167642;font-weight:800}.label{font-size:11px;color:#68757d;font-weight:800;letter-spacing:.08em}.row{margin:10px 0}.footer{margin-top:30px;font-size:12px;color:#68757d}</style></head><body><h1>RailWatch Incident Report</h1><div class="meta">DEMO · NOT AN AUTHORITATIVE TRANSNET RECORD</div><div class="box"><div class="label">INCIDENT</div><div class="row"><b>${esc(data?.alert_type || 'LINE BREACH')}</b> · ${esc(data?.segment || 'Demo sector')} · KM ${Number(data?.km_marker || 0).toFixed(1)}</div><div class="row">Asset: ${esc(assetName)}</div><div class="row">Response unit: ${esc(teamName)}</div></div><div class="box"><div class="label">STATUS</div><div class="row ok">INCIDENT CLOSED · EVIDENCE PRESERVED</div></div><div class="box"><div class="label">EVIDENCE PACKAGE</div><div class="row">Sensor event · Asset record · CCTV demo evidence · Response action · Operator closure</div></div><div class="box"><div class="label">TIMELINE</div><div class="row">Detected → Located → Verified → Dispatched → Resolved → Closed</div></div><div class="footer">Prototype report generated locally by NahaLabs RailWatch Command Center.</div></body></html>`);
+      report.document.open();
+      report.document.write(buildReportHtml(data, assetName, teamName, stamp));
       report.document.close();
     });
   }
