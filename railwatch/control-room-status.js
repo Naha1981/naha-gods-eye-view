@@ -35,6 +35,7 @@
   const assets = root.querySelector('#crs-assets');
   const unresolved = root.querySelector('#crs-unresolved');
   const stages = [...root.querySelectorAll('.crs-stage')];
+  let hasActiveIncident = false;
 
   const stageIndex = { DETECT: 0, LOCATE: 1, VERIFY: 2, RESPOND: 3, RESOLVE: 4, PROVE: 5 };
 
@@ -61,6 +62,7 @@
     assets.textContent = String(assetList.length);
     unresolved.textContent = String(unresolvedCount);
     root.classList.add('has-incident');
+    hasActiveIncident = true;
     updateStage('DETECT');
   }
 
@@ -71,12 +73,13 @@
   }
 
   async function hydrateRecentIncident() {
+    if (hasActiveIncident) return;
     try {
       const response = await fetch(`${apiBase}/api/v1/events?limit=1`);
-      if (!response.ok) return;
+      if (!response.ok || hasActiveIncident) return;
       const events = await response.json();
       const latest = events?.at(-1)?.data;
-      if (latest) ingest(latest);
+      if (latest && !hasActiveIncident) ingest(latest);
     } catch (_) {
       // Main map and operator workflow remain usable if the API is unavailable.
     }
