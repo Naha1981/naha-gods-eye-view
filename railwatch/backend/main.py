@@ -34,6 +34,15 @@ class CameraPreset(BaseModel):
     range_meters: float = Field(default=300, gt=50, le=5000)
 
 
+class IncidentContext(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    location_name: str = Field(min_length=2, max_length=180)
+    asset_type: str = Field(min_length=2, max_length=120)
+    asset_condition: str = Field(min_length=2, max_length=160)
+    operational_impact: str = Field(min_length=2, max_length=240)
+    recommended_action: str = Field(min_length=2, max_length=240)
+
+
 class TelemetryBreachAlert(BaseModel):
     model_config = ConfigDict(extra="forbid")
     event_id: str = Field(min_length=3, max_length=120, pattern=r"^[A-Za-z0-9._:-]+$")
@@ -47,6 +56,7 @@ class TelemetryBreachAlert(BaseModel):
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     camera_preset: CameraPreset = Field(default_factory=CameraPreset)
     media_url: str | None = Field(default=None, max_length=500)
+    incident: IncidentContext | None = None
 
 
 ALLOWED_ORIGINS_RAW = os.getenv("RAILWATCH_ALLOWED_ORIGINS", "http://localhost:5173")
@@ -59,7 +69,7 @@ MAX_EVENTS = int(os.getenv("RAILWATCH_MAX_EVENTS", "2000"))
 
 app = FastAPI(
     title="Naha RailWatch Telemetry Engine",
-    version="0.2.0",
+    version="0.3.0",
     description="Authenticated real-time rail telemetry ingestion and command-center broadcasting.",
 )
 
@@ -122,7 +132,7 @@ async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> 
 
     payload = {
         "action": "TRIGGER_ALARM",
-        "schema_version": "1.0",
+        "schema_version": "1.1",
         "data": {
             "event_id": alert.event_id,
             "corridor": alert.corridor_code,
@@ -136,6 +146,7 @@ async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> 
             "target_label": f"{alert.severity}: {alert.segment_name} · KM {alert.km_marker:.1f}",
             "camera_preset": alert.camera_preset.model_dump(),
             "media_url": alert.media_url,
+            "incident": alert.incident.model_dump() if alert.incident else None,
             "timestamp": timestamp.isoformat(),
         },
     }
@@ -225,6 +236,13 @@ async def demo_line_breach(_: None = Depends(demo_rate_guard)) -> dict[str, Any]
         severity=Severity.CRITICAL,
         sensor_id="DEMO-SENSOR-01",
         timestamp=datetime.now(timezone.utc),
-        camera_preset=CameraPreset(pitch=-45, heading=120, range_meters=300),
+        camera_preset=CameraPreset(pitch=-48, heading=35, range_meters=420),
+        incident=IncidentContext(
+            location_name="Ermelo–Richards Bay Coal Line · Demo Sector",
+            asset_type="Trackside signalling / cable infrastructure",
+            asset_condition="Possible tampering or physical damage detected",
+            operational_impact="Potential line interruption; train movement should be verified before dispatch",
+            recommended_action="Dispatch nearest response team and verify track status via field crew / CCTV",
+        ),
     )
     return await _store_and_broadcast(alert, alert.event_id)
