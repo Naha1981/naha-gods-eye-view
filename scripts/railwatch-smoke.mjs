@@ -95,11 +95,18 @@ try {
       // incident popover, but the explicit refresh removes any dependency on mutation timing.
       await page.evaluate(() => document.dispatchEvent(new CustomEvent('railwatch:intelligence-refresh')));
       await page.waitForFunction(() => Boolean(document.querySelector('#railwatch-intelligence-panel')), { timeout: 5_000 });
+      const intelligenceText = await page.$eval('#railwatch-intelligence-panel', el => el.textContent);
       assert.equal(await page.$eval('.rw-intel-cctv-grid strong', el => el.textContent.trim()), 'DEMO-CAM-0142');
-      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /86\/ 100|86/);
-      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /HIGH RISK/);
-      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /GEOAGENT/);
-      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /VERIFY TRAIN MOVEMENT BEFORE DISPATCH/);
+      assert.match(intelligenceText, /86\/ 100|86/);
+      assert.match(intelligenceText, /HIGH RISK/);
+      assert.match(intelligenceText, /GEOAGENT/);
+      assert.match(intelligenceText, /VERIFY TRAIN MOVEMENT BEFORE DISPATCH/);
+      assert.match(intelligenceText, /RECOMMENDED RESPONSE/);
+      assert.match(intelligenceText, /VERIFY → THEN DISPATCH/);
+      assert.match(intelligenceText, /INCIDENT HISTORY SIGNAL/);
+      assert.match(intelligenceText, /EVIDENCE CHAIN/);
+      assert.match(intelligenceText, /SIGNAL/);
+      assert.match(intelligenceText, /PROOF/);
 
       await page.waitForSelector('[data-acknowledge-incident]', { timeout: 5_000 });
       assert.match(await page.$eval('#crs-status', el => el.textContent), /ACTIVE/);
@@ -126,6 +133,9 @@ try {
       console.log('  CCTV intelligence ✓');
       console.log('  explainable geo-risk ✓');
       console.log('  GeoAgent decision support ✓');
+      console.log('  response recommendation ✓');
+      console.log('  evidence chain ✓');
+      console.log('  incident history signal ✓');
       console.log('  acknowledgement ✓');
       console.log('  dispatch ✓');
       console.log('  proof package ✓');
