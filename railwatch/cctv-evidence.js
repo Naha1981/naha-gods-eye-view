@@ -32,7 +32,7 @@
         <div class="rw-cctv-caption"><span class="positive" id="rw-cctv-availability">VIDEO LOADING</span><span>OPERATOR VIEW · VISUAL VERIFICATION</span></div>
         <div class="rw-cctv-grid">
           <div class="rw-cctv-kpi high"><span>INCIDENT</span><strong id="rw-cctv-incident">CRITICAL</strong></div>
-          <div class="rw-cctv-kpi high"><span>CAMERA</span><strong id="rw-cctv-camera">CAM-DEMO</strong></div>
+          <div class="rw-cctv-kpi high"><span>CAMERA</span><strong id="rw-cctv-camera">DEMO-CAM-0142</strong></div>
           <div class="rw-cctv-kpi medium"><span>ASSET</span><strong id="rw-cctv-asset">TRACK</strong></div>
           <div class="rw-cctv-kpi good"><span>FEED STATE</span><strong id="rw-cctv-feed-state">LOADING</strong></div>
         </div>
@@ -71,7 +71,7 @@
     const root = ensureOverlay();
     const video = root.querySelector('#rw-cctv-video');
     root.querySelector('#rw-cctv-title').textContent = 'CCTV evidence · visual verification';
-    root.querySelector('#rw-cctv-camera').textContent = 'CAM-DEMO-17';
+    root.querySelector('#rw-cctv-camera').textContent = 'DEMO-CAM-0142';
     root.querySelector('#rw-cctv-asset').textContent = (document.querySelector('.incident-popover h2')?.textContent || 'RAIL ASSET').slice(0, 24).toUpperCase();
     root.querySelector('#rw-cctv-location').textContent = 'RAIL CORRIDOR · DEMO SECTOR';
     root.querySelector('#rw-cctv-time').textContent = nowSast();
