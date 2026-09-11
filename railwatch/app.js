@@ -81,6 +81,36 @@ function buildCorridorLayer() {
 
 buildCorridorLayer();
 
+function addIncidentAssets(data) {
+  const assets = data.incident?.assets || [];
+  assets.forEach(asset => {
+    const id = `${data.event_id}-asset-${asset.asset_id}`;
+    viewer.entities.removeById(id);
+    const entity = viewer.entities.add({
+      id,
+      position: Cesium.Cartesian3.fromDegrees(asset.longitude, asset.latitude, Number(data.elevation_m || 0) + 8),
+      point: {
+        pixelSize: 12,
+        color: asset.status === 'ALERT' ? Cesium.Color.ORANGE : Cesium.Color.WHITE,
+        outlineColor: Cesium.Color.BLACK,
+        outlineWidth: 2,
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+      label: {
+        text: `${asset.asset_type} · ${asset.distance_km.toFixed(1)} km`,
+        font: '700 10px ui-monospace, SFMono-Regular, Menlo, monospace',
+        showBackground: true,
+        backgroundColor: Cesium.Color.fromAlpha(Cesium.Color.BLACK, 0.7),
+        fillColor: Cesium.Color.WHITE,
+        pixelOffset: new Cesium.Cartesian2(12, 0),
+        disableDepthTestDistance: Number.POSITIVE_INFINITY,
+      },
+    });
+    entity.railwatchData = data;
+    entity.railwatchAsset = asset;
+  });
+}
+
 function addAlert(data) {
   const [lat, lon] = data.location;
   const elevation = Number(data.elevation_m || 0);
@@ -135,6 +165,8 @@ function addAlert(data) {
     ring.railwatchData = data;
   });
 
+  addIncidentAssets(data);
+
   const center = Cesium.BoundingSphere.fromPoints([
     hazardPosition,
     Cesium.Cartesian3.fromDegrees(lon, lat, elevation + 20),
@@ -154,7 +186,7 @@ function addAlert(data) {
     <div class="alert-severity">${escapeHtml(data.severity)}</div>
     <strong>${escapeHtml(data.segment)} · KM ${Number(data.km_marker).toFixed(1)}</strong>
     <span>${escapeHtml(data.alert_type)} · ${escapeHtml(data.sensor_id)}</span>
-    <small>${escapeHtml(incident.asset_type || 'Asset details pending')}</small>
+    <small>${escapeHtml(incident.asset_type || 'Asset details pending')} · ${(incident.assets || []).length} nearby assets</small>
   `;
   row.addEventListener('mouseenter', () => showIncident(data, window.innerWidth - 360, 170));
   row.addEventListener('mouseleave', hideIncident);
@@ -163,6 +195,15 @@ function addAlert(data) {
 
 function showIncident(data, x, y) {
   const incident = data.incident || {};
+  const assets = incident.assets || [];
+  const assetRows = assets.length
+    ? `<div class="asset-list"><div class="asset-list-title">NEARBY INFRASTRUCTURE</div>${assets.map(asset => `
+        <div class="asset-row">
+          <div><strong>${escapeHtml(asset.asset_type)}</strong><span>${escapeHtml(asset.name)}</span></div>
+          <b>${Number(asset.distance_km).toFixed(1)} km</b>
+        </div>`).join('')}</div>`
+    : '';
+
   incidentPopover.innerHTML = `
     <div class="popover-critical">● ${escapeHtml(data.severity)} INCIDENT</div>
     <h2>${escapeHtml(incident.location_name || data.segment)}</h2>
@@ -172,12 +213,14 @@ function showIncident(data, x, y) {
       <div><span>SENSOR</span><strong>${escapeHtml(data.sensor_id)}</strong></div>
       <div><span>ASSET</span><strong>${escapeHtml(incident.asset_type || 'Unknown')}</strong></div>
     </div>
+    ${assetRows}
     <p><b>Condition</b><br>${escapeHtml(incident.asset_condition || 'Assessment pending')}</p>
     <p><b>Operational impact</b><br>${escapeHtml(incident.operational_impact || 'Impact assessment pending')}</p>
     <p><b>Recommended action</b><br>${escapeHtml(incident.recommended_action || 'Verify with field operations')}</p>
+    <div class="popover-foot">${escapeHtml(incident.data_classification || 'DEMO · NOT AUTHORITATIVE GIS')}</div>
   `;
   incidentPopover.style.left = `${Math.min(Math.max(16, x), window.innerWidth - 380)}px`;
-  incidentPopover.style.top = `${Math.min(Math.max(90, y), window.innerHeight - 300)}px`;
+  incidentPopover.style.top = `${Math.min(Math.max(90, y), window.innerHeight - 410)}px`;
   incidentPopover.classList.add('visible');
 }
 
