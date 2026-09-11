@@ -89,7 +89,8 @@ try {
 
       const firstAlert = await page.$('.alert');
       assert(firstAlert);
-      await firstAlert.hover();
+      await firstAlert.click();
+      await page.waitForSelector('#incident-popover.visible', { timeout: 5_000 });
 
       // Make the intelligence layer deterministic for CI. The UI also observes the
       // incident popover, but the explicit refresh removes any dependency on mutation timing.
