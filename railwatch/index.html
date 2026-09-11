@@ -22,8 +22,12 @@
     <div class="panel-title">LIVE OPERATIONS</div>
     <div class="metric"><span>ACTIVE ALERTS</span><strong id="alert-count">0</strong></div>
     <div class="metric"><span>SOCKET CLIENTS</span><strong id="client-count">—</strong></div>
+    <div class="network-status">
+      <span>RAIL NETWORK</span>
+      <strong>6 CORRIDORS · SCHEMATIC</strong>
+    </div>
     <button id="demo-alert" type="button">SIMULATE LINE BREACH</button>
-    <p class="hint">Demo coordinates are placeholders. Production feeds should come from authenticated Transnet/partner telemetry.</p>
+    <p class="hint">The corridor layer is an operational schematic for the prototype. Production deployment should use Transnet-authoritative GIS/network assets.</p>
   </aside>
   <section id="alert-feed" class="feed" aria-live="polite"></section>
   <div id="incident-popover" class="incident-popover" role="dialog" aria-live="polite"></div>
