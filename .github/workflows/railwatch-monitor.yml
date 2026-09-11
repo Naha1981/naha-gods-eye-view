@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: write
 
 concurrency:
   group: railwatch-monitor
@@ -28,8 +29,26 @@ jobs:
         with:
           node-version: 24.14.0
 
+      - name: Prove the monitor catches synthetic drift
+        run: npm run railwatch:monitor:selftest
+
       - name: Probe Render service
+        id: probe
         env:
           RAILWATCH_API_URL: https://naha-railwatch-api.onrender.com
           EXPECTED_RENDER_COMMIT: ${{ github.sha }}
         run: npm run railwatch:monitor
+
+      - name: Raise persistent GitHub alert on failure
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="RailWatch monitor alert"
+          BODY="## RailWatch monitor failure\n\n- Workflow: $GITHUB_WORKFLOW\n- Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\n- Commit checked: $GITHUB_SHA\n- Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')\n\nThe scheduled health/fingerprint monitor failed. Inspect the workflow logs before closing this alert."
+          EXISTING=$(gh issue list --state open --search "${TITLE} in:title" --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
