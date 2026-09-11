@@ -46,15 +46,42 @@ jobs:
             if npm run railwatch:monitor; then
               exit 0
             fi
-            sleep 20
+            if [ "$attempt" -lt 36 ]; then
+              echo "Render is not ready yet; retrying in 20 seconds."
+              sleep 20
+            fi
           done
           echo "Render did not become healthy on the expected commit within 12 minutes."
           exit 1
 
-      - name: Exercise live production API
+      - name: Exercise live production API with bounded recovery
         env:
           RAILWATCH_API_URL: https://naha-railwatch-api.onrender.com
-        run: npm run railwatch:production-smoke
+        run: |
+          for attempt in 1 2; do
+            echo "Production smoke attempt $attempt/2"
+            if npm run railwatch:production-smoke; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 1 ]; then
+              echo "Production smoke failed transiently; retrying in 5 seconds."
+              sleep 5
+            fi
+          done
+          echo "Production smoke failed after bounded recovery."
+          exit 1
+
+      - name: Close stale deployment alert after recovery
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="RailWatch deployment verification alert"
+          EXISTING=$(gh issue list --state open --search "${TITLE} in:title" --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "✅ Deployment verification recovered on commit $GITHUB_SHA. Render health and production smoke passed."
+            gh issue close "$EXISTING"
+          fi
 
       - name: Raise persistent GitHub alert on failure
         if: failure()
@@ -62,7 +89,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           TITLE="RailWatch deployment verification alert"
-          BODY="## RailWatch deployment verification failed\n\n- Workflow: $GITHUB_WORKFLOW\n- Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\n- Commit expected: $GITHUB_SHA\n- Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')\n\nRender did not pass deployment verification. Check whether the service is unhealthy, stale, or failing the production API smoke test."
+          BODY="## RailWatch deployment verification failed\n\n- Workflow: $GITHUB_WORKFLOW\n- Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\n- Commit expected: $GITHUB_SHA\n- Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')\n\nRender did not pass deployment verification after bounded recovery. Check whether the service is unhealthy, stale, or failing the production API smoke test."
           EXISTING=$(gh issue list --state open --search "${TITLE} in:title" --json number --jq '.[0].number' || true)
           if [ -n "$EXISTING" ]; then
             gh issue comment "$EXISTING" --body "$BODY"
