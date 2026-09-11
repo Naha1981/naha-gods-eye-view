@@ -154,8 +154,16 @@ try {
       await page.waitForSelector('.alert', { timeout: 10_000 });
 
       const firstAlert = await page.$('.alert');
-      assert(firstAlert, 'Expected at least one alert element');
+      assert(firstAlert);
       await firstAlert.hover();
+
+      await page.waitForSelector('#railwatch-intelligence-panel', { timeout: 5_000 });
+      assert.equal(await page.$eval('.rw-intel-cctv-grid strong', el => el.textContent.trim()), 'DEMO-CAM-0142');
+      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /86\/ 100|86/);
+      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /HIGH RISK/);
+      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /GEOAGENT/);
+      assert.match(await page.$eval('#railwatch-intelligence-panel', el => el.textContent), /VERIFY TRAIN MOVEMENT BEFORE DISPATCH/);
+
       await page.waitForSelector('[data-acknowledge-incident]', { timeout: 5_000 });
       assert.match(await page.$eval('#crs-status', el => el.textContent), /ACTIVE/);
 
@@ -183,6 +191,9 @@ try {
       await page.screenshot({ path: 'artifacts/railwatch-smoke-proof.png', fullPage: true });
       console.log('RailWatch smoke PASS');
       console.log('  DETECT → LOCATE → VERIFY → RESPOND → RESOLVE → PROVE');
+      console.log('  CCTV intelligence ✓');
+      console.log('  explainable geo-risk ✓');
+      console.log('  GeoAgent decision support ✓');
       console.log('  acknowledgement ✓');
       console.log('  dispatch ✓');
       console.log('  proof package ✓');
