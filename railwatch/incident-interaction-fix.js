@@ -1,5 +1,6 @@
 (() => {
   const feed = document.getElementById('alert-feed');
+  const historyOpen = document.getElementById('history-open');
   const apiBase = (new URLSearchParams(location.search).get('api') || 'https://naha-railwatch-api.onrender.com').replace(/\/$/, '');
   if (!feed) return;
 
@@ -46,6 +47,8 @@
       console.debug('Incident history hydration unavailable', error);
     }
   }
+
+  historyOpen?.addEventListener('click', () => window.RailWatchHistory?.show?.());
 
   const observer = new MutationObserver(() => wireAlertCards());
   observer.observe(feed, { childList: true, subtree: true });
