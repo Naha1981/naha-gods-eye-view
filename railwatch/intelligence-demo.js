@@ -15,14 +15,16 @@
     return String(value ?? '').replace(/[&<>\"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
   }
 
-  function removeExisting() {
-    document.getElementById(ROOT_ID)?.remove();
-  }
-
   function currentAssetType() {
     const assetLabel = [...document.querySelectorAll('.incident-popover .popover-grid span')]
       .find(el => el.textContent.trim() === 'ASSET');
     return assetLabel?.parentElement?.querySelector('strong')?.textContent?.trim() || 'RAIL INFRASTRUCTURE';
+  }
+
+  function currentHistorySignal() {
+    const rows = document.querySelectorAll('.incident-history-row');
+    if (!rows.length) return 'NO PRIOR CASE IN CURRENT SESSION';
+    return `${rows.length} DEMO CASE${rows.length === 1 ? '' : 'S'} IN CURRENT SESSION`;
   }
 
   function buildIncidentPanel() {
@@ -33,6 +35,7 @@
 
     const heading = popover.querySelector('h2')?.textContent?.trim() || 'Rail infrastructure incident';
     const assetType = currentAssetType();
+    const historySignal = currentHistorySignal();
 
     const root = document.createElement('section');
     root.id = ROOT_ID;
@@ -87,11 +90,39 @@
         </div>
       </div>
 
+      <div class="rw-intel-response">
+        <div class="rw-intel-section-title">RECOMMENDED RESPONSE · HUMAN APPROVAL</div>
+        <div class="rw-intel-action-primary"><span>PRIORITY ACTION</span><strong>VERIFY → THEN DISPATCH</strong></div>
+        <div class="rw-intel-response-steps">
+          <div><b>1</b><span>Acknowledge incident</span><em>OPERATOR</em></div>
+          <div><b>2</b><span>Review CCTV evidence</span><em>OPERATOR</em></div>
+          <div><b>3</b><span>Verify train movement / operating impact</span><em>OPERATOR</em></div>
+          <div><b>4</b><span>Dispatch field response if verified</span><em>OPERATOR</em></div>
+        </div>
+        <div class="rw-intel-footnote">No autonomous signalling, train movement, or field dispatch is performed by this prototype.</div>
+      </div>
+
+      <div class="rw-intel-history">
+        <div class="rw-intel-section-title">INCIDENT HISTORY SIGNAL</div>
+        <div class="rw-intel-history-grid">
+          <div><span>SESSION HISTORY</span><strong>${esc(historySignal)}</strong></div>
+          <div><span>VALIDATED PATTERN</span><strong>NOT ESTABLISHED IN DEMO</strong></div>
+        </div>
+        <div class="rw-intel-footnote">Production version can correlate retained incidents, maintenance records, CCTV evidence and infrastructure history.</div>
+      </div>
+
+      <div class="rw-intel-chain">
+        <div class="rw-intel-section-title">EVIDENCE CHAIN</div>
+        <div class="rw-intel-chain-grid">
+          <span class="done">SIGNAL</span><i>→</i><span class="done">LOCATION</span><i>→</i><span class="done">ASSET</span><i>→</i><span class="current">VERIFICATION</span><i>→</i><span>RESPONSE</span><i>→</i><span>PROOF</span>
+        </div>
+      </div>
+
       <div class="rw-intel-agent">
         <div class="rw-intel-section-title">GEOAGENT · DECISION SUPPORT</div>
         <p><b>Why this incident is high priority:</b> The event is critical, sits on a monitored freight corridor, overlaps three infrastructure assets and presents a potential line interruption. The safest next step is human verification before field response.</p>
         <div class="rw-intel-sources"><span>GIS · DEMO</span><span>ASSET REGISTRY · DEMO</span><span>CCTV · SIMULATED</span><span>INCIDENT HISTORY · SESSION</span></div>
-        <div class="rw-intel-footnote">Reasoning is demonstrative and human-reviewable. No autonomous train movement or field dispatch is performed by this prototype.</div>
+        <div class="rw-intel-footnote">Reasoning is demonstrative and human-reviewable. The production intelligence layer can replace these demo signals with authorised operational sources and validated models.</div>
       </div>
     `;
 
