@@ -188,12 +188,12 @@ function addAlert(data) {
     <span>${escapeHtml(data.alert_type)} · ${escapeHtml(data.sensor_id)}</span>
     <small>${escapeHtml(incident.asset_type || 'Asset details pending')} · ${(incident.assets || []).length} nearby assets</small>
   `;
-  row.addEventListener('mouseenter', () => showIncident(data, window.innerWidth - 360, 170));
+  row.addEventListener('mouseenter', () => showIncident(data));
   row.addEventListener('mouseleave', hideIncident);
   feed.prepend(row);
 }
 
-function showIncident(data, x, y) {
+function showIncident(data) {
   const incident = data.incident || {};
   const assets = incident.assets || [];
   const assetRows = assets.length
@@ -219,8 +219,6 @@ function showIncident(data, x, y) {
     <p><b>Recommended action</b><br>${escapeHtml(incident.recommended_action || 'Verify with field operations')}</p>
     <div class="popover-foot">${escapeHtml(incident.data_classification || 'DEMO · NOT AUTHORITATIVE GIS')}</div>
   `;
-  incidentPopover.style.left = `${Math.min(Math.max(16, x), window.innerWidth - 380)}px`;
-  incidentPopover.style.top = `${Math.min(Math.max(90, y), window.innerHeight - 410)}px`;
   incidentPopover.classList.add('visible');
 }
 
@@ -238,7 +236,7 @@ const hoverHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
 hoverHandler.setInputAction((movement) => {
   const picked = viewer.scene.pick(movement.endPosition);
   if (Cesium.defined(picked) && picked.id?.railwatchData) {
-    showIncident(picked.id.railwatchData, movement.endPosition.x + 18, movement.endPosition.y + 18);
+    showIncident(picked.id.railwatchData);
     viewer.scene.canvas.style.cursor = 'crosshair';
   } else {
     hideIncident();
