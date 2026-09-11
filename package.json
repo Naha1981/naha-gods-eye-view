@@ -27,7 +27,8 @@
     "test": "node scripts/run-unit-tests.mjs",
     "test:track": "node scripts/track-regression.mjs",
     "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs",
-    "railwatch:smoke": "node scripts/railwatch-smoke.mjs"
+    "railwatch:smoke": "node scripts/railwatch-smoke.mjs",
+    "railwatch:monitor": "node scripts/railwatch-monitor.mjs"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
