@@ -1,0 +1,50 @@
+name: RailWatch smoke proof
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 * * * *'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railwatch-smoke-scheduled
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    name: Hourly operator smoke proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: '0'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx puppeteer browsers install chrome
+
+      - name: Run RailWatch smoke
+        run: npm run railwatch:smoke
+
+      - name: Upload smoke proof screenshot
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: railwatch-smoke-${{ github.run_id }}
+          path: railwatch-smoke-*.png
+          if-no-files-found: ignore
+          retention-days: 7
