@@ -12,7 +12,7 @@
     </header>
     <div class="incident-history-toolbar">
       <span id="incident-history-count">0 CASES</span>
-      <button id="incident-history-toggle" type="button">SHOW HISTORY</button>
+      <button id="incident-history-toggle" type="button">HIDE HISTORY</button>
     </div>
     <div id="incident-history-list" class="incident-history-list">
       <div class="incident-history-empty">No incidents recorded in this session.</div>
@@ -24,7 +24,7 @@
   const count = root.querySelector('#incident-history-count');
   const toggle = root.querySelector('#incident-history-toggle');
   const cases = [];
-  let open = false;
+  let open = true;
 
   function esc(value) {
     return String(value ?? '').replace(/[&<>\'\"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[ch]));
@@ -74,16 +74,21 @@
     render();
   }
 
-  root.querySelector('.incident-history-close').addEventListener('click', () => {
-    root.classList.remove('visible');
+  function openHistory() {
+    open = true;
+    root.classList.add('visible');
+    toggle.textContent = 'HIDE HISTORY';
+  }
+
+  function closeHistory() {
     open = false;
+    root.classList.remove('visible');
     toggle.textContent = 'SHOW HISTORY';
-  });
-  toggle.addEventListener('click', () => {
-    open = !open;
-    root.classList.toggle('visible', open);
-    toggle.textContent = open ? 'HIDE HISTORY' : 'SHOW HISTORY';
-  });
+  }
+
+  root.querySelector('.incident-history-close').addEventListener('click', closeHistory);
+  toggle.addEventListener('click', () => open ? closeHistory() : openHistory());
+  document.getElementById('history-open')?.addEventListener('click', openHistory);
   list.addEventListener('click', event => {
     const row = event.target.closest('[data-index]');
     if (!row) return;
@@ -115,6 +120,8 @@
     };
   }
 
+  root.classList.remove('visible');
+  open = false;
   render();
-  window.RailWatchHistory = { record, markClosed, show: () => { open = true; root.classList.add('visible'); toggle.textContent = 'HIDE HISTORY'; } };
+  window.RailWatchHistory = { record, markClosed, show: openHistory };
 })();
