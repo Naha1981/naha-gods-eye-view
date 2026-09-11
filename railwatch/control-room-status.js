@@ -1,4 +1,7 @@
 (() => {
+  const params = new URLSearchParams(location.search);
+  const apiBase = (params.get('api') || 'https://naha-railwatch-api.onrender.com').replace(/\/$/, '');
+
   const root = document.createElement('section');
   root.className = 'control-room-status';
   root.setAttribute('aria-label', 'Incident status overview');
@@ -34,10 +37,8 @@
   const stages = [...root.querySelectorAll('.crs-stage')];
 
   const stageIndex = { DETECT: 0, LOCATE: 1, VERIFY: 2, RESPOND: 3, RESOLVE: 4, PROVE: 5 };
-  let currentStage = 'DETECT';
 
   function updateStage(stage) {
-    currentStage = stage;
     const index = stageIndex[stage] ?? 0;
     stages.forEach((el, i) => {
       el.classList.toggle('active', i === index);
@@ -50,8 +51,8 @@
     if (!incident) return;
     const assetList = Array.isArray(incident.assets) ? incident.assets : [];
     const unresolvedCount = assetList.filter(asset => {
-      const status = String(asset.status || '').toUpperCase();
-      return status === 'ALERT' || status === 'UNKNOWN';
+      const value = String(asset.status || '').toUpperCase();
+      return value === 'ALERT' || value === 'UNKNOWN';
     }).length;
     title.textContent = String(data.alert_type || 'LINE BREACH').replace(/_/g, ' ');
     locationEl.textContent = `${data.segment || 'Demo sector'} · KM ${Number(data.km_marker || 0).toFixed(1)}`;
@@ -69,7 +70,20 @@
     if (stage === 'PROVE') status.textContent = 'CLOSED · EVIDENCE PRESERVED';
   }
 
+  async function hydrateRecentIncident() {
+    try {
+      const response = await fetch(`${apiBase}/api/v1/events?limit=1`);
+      if (!response.ok) return;
+      const events = await response.json();
+      const latest = events?.at(-1)?.data;
+      if (latest) ingest(latest);
+    } catch (_) {
+      // Main map and operator workflow remain usable if the API is unavailable.
+    }
+  }
+
   document.addEventListener('railwatch:incident', event => ingest(event.detail));
   document.addEventListener('railwatch:stage', event => setResolutionStage(event.detail?.stage));
   window.RailWatchControlRoom = { ingest, setResolutionStage };
+  hydrateRecentIncident();
 })();
