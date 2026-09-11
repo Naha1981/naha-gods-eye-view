@@ -17,20 +17,6 @@
   "engines": {
     "node": ">=24.14.0 <25 || >=26 <27"
   },
-  "keywords": [
-    "cesium",
-    "3d-globe",
-    "geospatial",
-    "osint",
-    "spatial-intelligence",
-    "photorealistic-3d-tiles",
-    "adsb",
-    "ais",
-    "satellites",
-    "voice-control",
-    "openai-realtime",
-    "visualization"
-  ],
   "scripts": {
     "doctor": "node scripts/setup-doctor.mjs",
     "dev": "vite",
@@ -40,7 +26,8 @@
     "preview": "vite preview",
     "test": "node scripts/run-unit-tests.mjs",
     "test:track": "node scripts/track-regression.mjs",
-    "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs"
+    "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs",
+    "railwatch:smoke": "node scripts/railwatch-smoke.mjs"
   },
   "dependencies": {
     "@mapbox/vector-tile": "^3.0.0",
