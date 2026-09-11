@@ -78,10 +78,8 @@ try {
   try {
     const page = await browser.newPage({ viewport: { width: 1600, height: 1000 } });
     const consoleErrors = [];
-    const popupPromises = [];
     page.on('console', message => { if (message.type() === 'error') consoleErrors.push(message.text()); });
     page.on('pageerror', error => consoleErrors.push(error.message));
-    page.on('popup', popup => popupPromises.push(popup));
     const url = `http://127.0.0.1:4173/railwatch/?api=http://127.0.0.1:${backendPort}`;
     try {
       await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 });
@@ -92,11 +90,10 @@ try {
       const firstAlert = await page.$('.alert');
       assert(firstAlert);
       await firstAlert.click();
-      // Invoke the same production incident renderer directly. This keeps CI independent
-      // from the alert-card's async lookup timing while still exercising the real UI path.
-      await page.evaluate(() => {
-        if (!window.showIncident) throw new Error('showIncident renderer is not available');
-        window.showIncident(window.__railwatchSmokeEvent || null);
+      if (!window.showIncident) {}
+      await page.evaluate((event) => {
+        if (typeof window.showIncident !== 'function') throw new Error('showIncident renderer is not available');
+        window.showIncident(event);
       }, demoEvent);
       await page.waitForSelector('#incident-popover', { timeout: 5_000 });
 
@@ -122,6 +119,8 @@ try {
       assert(await page.$eval('.crs-stage[data-stage="LOCATE"]', el => el.classList.contains('active')));
       await page.click('.asset-select');
       assert(await page.$eval('.crs-stage[data-stage="VERIFY"]', el => el.classList.contains('active')));
+
+      await page.waitForSelector('.asset-operator button[data-action="dispatched"]', { timeout: 10_000 });
       await page.click('.asset-operator button[data-action="dispatched"]');
       await page.waitForSelector('.dispatch-intelligence.visible #dispatch-confirm', { timeout: 5_000 });
       await page.click('#dispatch-confirm');
@@ -134,18 +133,23 @@ try {
       assert.equal(await page.$eval('#crs-status', el => el.textContent.trim()), 'CLOSED · EVIDENCE PRESERVED');
       assert(await page.$eval('.crs-stage[data-stage="PROVE"]', el => el.classList.contains('active')));
 
-      const reportPromise = page.evaluate(() => new Promise((resolve, reject) => {
+      await page.evaluate(() => new Promise((resolve, reject) => {
         const timer = setTimeout(() => reject(new Error('Timed out waiting for incident report popup')), 5_000);
         window.__railwatchReportCaptured = value => { clearTimeout(timer); resolve(value); };
-        const originalOpen = window.open;
+        window.__railwatchOriginalOpen = window.open;
         window.open = function() {
-          const popup = { document: { open() {}, close() {}, write(html) { window.__railwatchReportCaptured(html); } } };
-          return popup;
+          return { document: { open() {}, close() {}, write(html) { window.__railwatchReportCaptured(html); } } };
         };
-        window.__railwatchOriginalOpen = originalOpen;
       }));
       await page.click('#view-report');
-      const reportHtml = await reportPromise;
+      const reportHtml = await page.evaluate(() => new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Timed out capturing report HTML')), 5_000);
+        const check = () => {
+          if (window.__railwatchCapturedReport) { clearTimeout(timer); resolve(window.__railwatchCapturedReport); return; }
+          setTimeout(check, 25);
+        };
+        check();
+      }));
       await page.evaluate(() => { if (window.__railwatchOriginalOpen) window.open = window.__railwatchOriginalOpen; });
       assert.match(reportHtml, /Incident Evidence Report/);
       assert.match(reportHtml, /DEMO · NOT AN AUTHORITATIVE TRANSNET RECORD/);
