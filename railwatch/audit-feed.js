@@ -57,6 +57,12 @@
     add(stage, messages[stage] || 'Workflow stage advanced', stage === 'PROVE' ? 'success' : 'info');
   });
 
+  document.addEventListener('railwatch:audit', event => {
+    const action = event.detail?.action;
+    const detail = event.detail?.detail;
+    if (action) add(action, detail || 'Operator action recorded', action.includes('SEALED') ? 'success' : 'info');
+  });
+
   document.addEventListener('click', event => {
     const el = event.target.closest('button, [role="button"]');
     if (!el) return;
