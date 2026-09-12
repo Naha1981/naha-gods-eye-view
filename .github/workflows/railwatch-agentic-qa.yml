@@ -48,8 +48,8 @@ jobs:
         with:
           name: railwatch-agentic-qa-evidence
           path: |
-            artifacts/railwatch-agentic-qa.json
-            artifacts/railwatch-agentic-qa.png
+            artifacts/railwatch-workspace-qa.json
+            artifacts/railwatch-workspace-qa.png
           if-no-files-found: ignore
           retention-days: 14
 
