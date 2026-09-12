@@ -112,7 +112,6 @@
         source: options.source || 'operator-ui',
       });
       saveAndRender();
-      root.classList.add('visible');
     });
     return queue;
   }
@@ -132,7 +131,6 @@
     entries = [];
     sealed = false;
     saveAndRender();
-    root.classList.add('visible');
     enqueueEntry('DETECT', 'SIGNAL', `${currentCase.alertType} received from ${currentCase.sensorId}`, { source: 'telemetry' });
     enqueueEntry('LOCATE', 'LOCATION', `${currentCase.segment} · KM ${currentCase.kmMarker.toFixed(1)}`, { source: 'schematic-gis' });
   }
