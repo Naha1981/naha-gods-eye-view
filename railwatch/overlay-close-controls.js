@@ -1,13 +1,8 @@
 (() => {
-  const SECONDARY_SELECTORS = [
+  const INFORMATION_SELECTORS = [
     '.audit-feed-panel',
     '.evidence-ledger',
     '.incident-history',
-    '#railwatch-cctv-overlay',
-    '.asset-operator',
-    '.dispatch-intelligence',
-    '.dispatch-access',
-    '.resolution-intelligence',
   ];
 
   function addClose(root, onClose) {
@@ -27,16 +22,13 @@
   }
 
   function classVisible(root) {
-    if (!root) return false;
-    if (root.matches('.asset-operator')) return !root.classList.contains('closed');
-    return root.classList.contains('visible');
+    return Boolean(root?.classList.contains('visible'));
   }
 
   function setVisible(root, visible) {
     if (!root) return;
     root.classList.toggle('rw-workspace-active', visible);
-    if (root.matches('.asset-operator')) root.classList.toggle('closed', !visible);
-    else root.classList.toggle('visible', visible);
+    root.classList.toggle('visible', visible);
   }
 
   function ensureScrim() {
@@ -50,17 +42,16 @@
     return scrim;
   }
 
-  function allOverlays() {
-    return [document.getElementById('incident-popover'), ...SECONDARY_SELECTORS.flatMap(selector => [...document.querySelectorAll(selector)])]
+  function managedOverlays() {
+    return [document.getElementById('incident-popover'), ...INFORMATION_SELECTORS.flatMap(selector => [...document.querySelectorAll(selector)])]
       .filter(Boolean)
       .filter((root, index, list) => list.indexOf(root) === index);
   }
 
   function closeAll() {
-    allOverlays().forEach(root => setVisible(root, false));
+    managedOverlays().forEach(root => setVisible(root, false));
     document.body.classList.remove('rw-workspace-open');
-    const scrim = document.querySelector('.rw-workspace-scrim');
-    scrim?.classList.remove('visible');
+    ensureScrim().classList.remove('visible', 'nonblocking');
   }
 
   function find(type) {
@@ -85,13 +76,25 @@
   function open(type) {
     const target = find(type);
     if (!target) return false;
-    allOverlays().forEach(root => { if (root !== target) setVisible(root, false); });
-    setVisible(target, true);
+    const isIncidentOrCore = type === 'incident' || ['asset', 'dispatch', 'resolution', 'cctv'].includes(type);
+    if (isIncidentOrCore) {
+      managedOverlays().forEach(root => {
+        if (root === target) return;
+        if (root.matches('#incident-popover')) return;
+        setVisible(root, false);
+      });
+    } else {
+      managedOverlays().forEach(root => { if (root !== target) setVisible(root, false); });
+    }
+    if (type !== 'incident' && !isIncidentOrCore) setVisible(target, true);
+    else target.classList.add('visible', 'rw-workspace-active');
     syncIncidentTabs(type);
     document.body.classList.add('rw-workspace-open');
-    ensureScrim().classList.add('visible');
+    const scrim = ensureScrim();
+    scrim.classList.add('visible');
+    scrim.classList.toggle('nonblocking', isIncidentOrCore);
     target.dispatchEvent(new CustomEvent('railwatch:workspace-opened', { detail: { type } }));
-    target.querySelector('button, [tabindex="0"]')?.focus?.({ preventScroll: true });
+    if (type === 'incident') target.querySelector('[data-acknowledge-incident], .asset-select, button')?.focus?.({ preventScroll: true });
     return true;
   }
 
@@ -124,7 +127,7 @@
   }
 
   function injectBackNav(root) {
-    if (!root || root.matches('#incident-popover') || root.matches('#railwatch-cctv-overlay') || root.querySelector(':scope > .rw-workspace-back')) return;
+    if (!root || root.matches('#incident-popover') || root.querySelector(':scope > .rw-workspace-back')) return;
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'rw-workspace-back';
@@ -140,40 +143,33 @@
     const incident = document.getElementById('incident-popover');
     addClose(incident, close);
     injectIncidentNav(incident);
-
-    allOverlays().filter(root => root !== incident).forEach(root => {
-      injectBackNav(root);
-      if (root.matches('.dispatch-intelligence')) {
-        const existing = root.querySelector('#dispatch-close');
-        if (existing) existing.setAttribute('aria-label', 'Close response dispatch');
-      }
-    });
-
+    managedOverlays().filter(root => root !== incident).forEach(root => injectBackNav(root));
     ensureScrim();
+
     if (incident && classVisible(incident)) {
-      if (!incident.classList.contains('rw-workspace-active')) incident.classList.add('rw-workspace-active');
-      allOverlays().forEach(root => { if (root !== incident) setVisible(root, false); });
+      incident.classList.add('rw-workspace-active');
       document.body.classList.add('rw-workspace-open');
-      ensureScrim().classList.add('visible');
+      ensureScrim().classList.add('visible', 'nonblocking');
       syncIncidentTabs('incident');
       return;
     }
 
-    const activeSecondary = allOverlays().find(root => root !== incident && classVisible(root));
-    if (activeSecondary) {
-      activeSecondary.classList.add('rw-workspace-active');
-      allOverlays().forEach(root => { if (root !== activeSecondary) setVisible(root, false); });
+    const activeInformation = managedOverlays().find(root => root !== incident && classVisible(root));
+    if (activeInformation) {
+      activeInformation.classList.add('rw-workspace-active');
+      managedOverlays().forEach(root => { if (root !== activeInformation) setVisible(root, false); });
       document.body.classList.add('rw-workspace-open');
       ensureScrim().classList.add('visible');
+      ensureScrim().classList.remove('nonblocking');
       syncIncidentTabs(
-        activeSecondary.matches('.audit-feed-panel') ? 'activity' :
-        activeSecondary.matches('.evidence-ledger') ? 'ledger' :
-        activeSecondary.matches('.incident-history') ? 'history' : 'incident',
+        activeInformation.matches('.audit-feed-panel') ? 'activity' :
+        activeInformation.matches('.evidence-ledger') ? 'ledger' : 'history',
       );
-    } else {
-      document.body.classList.remove('rw-workspace-open');
-      ensureScrim().classList.remove('visible');
+      return;
     }
+
+    document.body.classList.remove('rw-workspace-open');
+    ensureScrim().classList.remove('visible', 'nonblocking');
   }
 
   window.RailWatchWorkspace = { open, close };
