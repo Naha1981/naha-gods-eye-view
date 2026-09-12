@@ -40,6 +40,10 @@
 
   const stageIndex = { DETECT: 0, LOCATE: 1, VERIFY: 2, RESPOND: 3, RESOLVE: 4, PROVE: 5 };
 
+  function emit(name, detail) {
+    document.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+
   function updateStage(stage, allowRegression = false) {
     if (!(stage in stageIndex)) return;
     if (!allowRegression && stageIndex[stage] < stageIndex[currentStage]) return;
@@ -49,6 +53,7 @@
       el.classList.toggle('active', i === index);
       el.classList.toggle('complete', i < index);
     });
+    emit('railwatch:stage', { stage, source: 'control-room-status' });
   }
 
   function ingest(data) {
@@ -67,7 +72,9 @@
     unresolved.textContent = String(unresolvedCount);
     root.classList.add('has-incident');
     hasActiveIncident = true;
-    updateStage('DETECT');
+    currentStage = 'DETECT';
+    emit('railwatch:incident', data);
+    updateStage('DETECT', true);
   }
 
   function setResolutionStage(stage) {
