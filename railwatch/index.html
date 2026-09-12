@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="./intelligence-demo.css" />
   <link rel="stylesheet" href="./evidence-ledger.css" />
   <link rel="stylesheet" href="./operations-assurance.css" />
+  <link rel="stylesheet" href="./whatsapp-operations.css" />
   <link rel="stylesheet" href="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Widgets/widgets.css" />
   <script src="https://cesium.com/downloads/cesiumjs/releases/1.124/Build/Cesium/Cesium.js"></script>
 </head>
@@ -41,11 +42,13 @@
     </div>
     <button id="demo-alert" type="button">SIMULATE LINE BREACH</button>
     <button id="history-open" type="button">INCIDENT HISTORY</button>
+    <button id="whatsapp-open" type="button" data-rw-open-workspace="whatsapp">WHATSAPP OPERATIONS</button>
     <p class="hint">The corridor layer is an operational schematic for the prototype. Production deployment should use Transnet-authoritative GIS/network assets.</p>
   </aside>
   <section id="alert-feed" class="feed" aria-live="polite"></section>
   <div id="incident-popover" class="incident-popover" role="dialog" aria-live="polite"></div>
   <script src="./app.js"></script>
+  <script src="./layout-guards.js"></script>
   <script src="./control-room-status.js"></script>
   <script src="./asset-operator.js"></script>
   <script src="./cctv-evidence.js"></script>
@@ -61,5 +64,6 @@
   <script src="./intelligence-demo.js"></script>
   <script src="./evidence-ledger.js"></script>
   <script src="./operations-assurance.js"></script>
+  <script src="./whatsapp-operations.js"></script>
 </body>
 </html>
