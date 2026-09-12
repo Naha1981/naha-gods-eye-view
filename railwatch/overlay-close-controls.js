@@ -75,11 +75,19 @@
     return null;
   }
 
+  function syncIncidentTabs(type) {
+    const incident = find('incident');
+    incident?.querySelectorAll('[data-rw-workspace]')?.forEach(button => {
+      button.classList.toggle('active', button.dataset.rwWorkspace === type);
+    });
+  }
+
   function open(type) {
     const target = find(type);
     if (!target) return false;
     allOverlays().forEach(root => { if (root !== target) setVisible(root, false); });
     setVisible(target, true);
+    syncIncidentTabs(type);
     document.body.classList.add('rw-workspace-open');
     ensureScrim().classList.add('visible');
     target.dispatchEvent(new CustomEvent('railwatch:workspace-opened', { detail: { type } }));
@@ -111,8 +119,6 @@
       const button = event.target.closest('[data-rw-workspace]');
       if (!button) return;
       event.preventDefault();
-      nav.querySelectorAll('[data-rw-workspace]').forEach(item => item.classList.remove('active'));
-      button.classList.add('active');
       open(button.dataset.rwWorkspace);
     });
   }
@@ -149,15 +155,21 @@
       allOverlays().forEach(root => { if (root !== incident) setVisible(root, false); });
       document.body.classList.add('rw-workspace-open');
       ensureScrim().classList.add('visible');
+      syncIncidentTabs('incident');
       return;
     }
 
     const activeSecondary = allOverlays().find(root => root !== incident && classVisible(root));
     if (activeSecondary) {
       activeSecondary.classList.add('rw-workspace-active');
-      allOverlays().forEach(root => { if (root !== activeSecondary) root.classList.remove('rw-workspace-active'); });
+      allOverlays().forEach(root => { if (root !== activeSecondary) setVisible(root, false); });
       document.body.classList.add('rw-workspace-open');
       ensureScrim().classList.add('visible');
+      syncIncidentTabs(
+        activeSecondary.matches('.audit-feed-panel') ? 'activity' :
+        activeSecondary.matches('.evidence-ledger') ? 'ledger' :
+        activeSecondary.matches('.incident-history') ? 'history' : 'incident',
+      );
     } else {
       document.body.classList.remove('rw-workspace-open');
       ensureScrim().classList.remove('visible');
