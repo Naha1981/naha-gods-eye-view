@@ -73,6 +73,7 @@ class TelemetryBreachAlert(BaseModel):
     camera_preset: CameraPreset = Field(default_factory=CameraPreset)
     media_url: str | None = Field(default=None, max_length=500)
     incident: IncidentContext | None = None
+    integration_metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 ALLOWED_ORIGINS_RAW = os.getenv("RAILWATCH_ALLOWED_ORIGINS", "http://localhost:5173")
@@ -167,6 +168,7 @@ def _build_payload(alert: TelemetryBreachAlert) -> dict[str, Any]:
             "camera_preset": alert.camera_preset.model_dump(),
             "media_url": alert.media_url,
             "incident": alert.incident.model_dump() if alert.incident else None,
+            "integration_metadata": alert.integration_metadata,
             "timestamp": timestamp.isoformat(),
         },
     }
