@@ -11,7 +11,7 @@
   ];
 
   function addClose(root, onClose) {
-    if (!root || root.querySelector(':scope > .overlay-close-control')) return;
+    if (!root || root.querySelector('.overlay-close-control, button[aria-label*="Close" i], button[title*="Close" i]')) return;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'overlay-close-control';
