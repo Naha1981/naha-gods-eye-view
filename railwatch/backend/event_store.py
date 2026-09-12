@@ -51,6 +51,11 @@ class EventStore:
                     except Exception as exc:
                         logger.warning("RailWatch audit adapter unavailable: %s", exc)
                     try:
+                        from incident_persistence import install as install_incidents
+                        install_incidents()
+                    except Exception as exc:
+                        logger.warning("RailWatch incident adapter unavailable: %s", exc)
+                    try:
                         from realtime_bus import install as install_realtime
                         install_realtime(app, manager)
                     except Exception as exc:
