@@ -80,6 +80,13 @@ async function waitFor(url, timeoutMs = 30000) {
   throw new Error(`Timed out waiting for ${url}\n${viteOutput}`);
 }
 
+const rectOverlaps = (a, b, gap = 0) => !(
+  a.right + gap <= b.left ||
+  a.left - gap >= b.right ||
+  a.bottom + gap <= b.top ||
+  a.top - gap >= b.bottom
+);
+
 const agents = [
   {
     name: 'Boot Agent',
@@ -89,6 +96,7 @@ const agents = [
       assert(await page.$('.topbar'), 'dashboard header missing');
       assert(await page.$('.panel'), 'operator panel missing');
       assert(await page.$('#alert-feed'), 'alert feed missing');
+      assert(await page.$('.control-room-status'), 'incident control status missing');
     },
   },
   {
@@ -139,6 +147,48 @@ const agents = [
     },
   },
   {
+    name: 'Control Room Layout Agent',
+    run: async page => {
+      const viewports = [
+        { width: 1600, height: 1000 },
+        { width: 1200, height: 900 },
+        { width: 1100, height: 900 },
+        { width: 700, height: 900 },
+      ];
+      for (const viewport of viewports) {
+        await page.setViewport(viewport);
+        await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const geometry = await page.evaluate(() => {
+          const rect = selector => {
+            const el = document.querySelector(selector);
+            if (!el) return null;
+            const r = el.getBoundingClientRect();
+            const style = getComputedStyle(el);
+            return { left: r.left, top: r.top, right: r.right, bottom: r.bottom, zIndex: Number(style.zIndex) || 0, display: style.display };
+          };
+          return {
+            viewport: { width: innerWidth, height: innerHeight },
+            status: rect('.control-room-status'),
+            header: rect('.topbar'),
+            panel: rect('.panel'),
+            feed: rect('.feed'),
+          };
+        });
+        assert(geometry.status, `incident control missing at ${viewport.width}x${viewport.height}`);
+        assert.equal(geometry.status.display, 'grid', `incident control not laid out as grid at ${viewport.width}x${viewport.height}`);
+        for (const [name, other] of [['header', geometry.header], ['left panel', geometry.panel], ['alert feed', geometry.feed]]) {
+          if (!other) continue;
+          assert(!rectOverlaps(geometry.status, other, 1), `incident control overlaps ${name} at ${viewport.width}x${viewport.height}`);
+        }
+        assert(geometry.status.left >= 0 && geometry.status.right <= geometry.viewport.width, `incident control escapes horizontally at ${viewport.width}x${viewport.height}`);
+        assert(geometry.status.top >= 0 && geometry.status.bottom <= geometry.viewport.height, `incident control escapes vertically at ${viewport.width}x${viewport.height}`);
+      }
+      await page.setViewport({ width: 1600, height: 1000 });
+      await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+    },
+  },
+  {
     name: 'Evidence Agent',
     run: async page => {
       const text = await page.$eval('#incident-popover', el => el.textContent || '');
@@ -185,7 +235,7 @@ try {
     await import('node:fs/promises').then(({ writeFile }) => writeFile('artifacts/railwatch-agentic-qa.json', JSON.stringify(summary, null, 2)));
     await page.screenshot({ path: 'artifacts/railwatch-agentic-qa.png', fullPage: true });
     console.log('RailWatch autonomous QA PASS');
-    console.log('  specialized agents: boot, incident flow, UX guard, evidence, console sentinel');
+    console.log('  specialized agents: boot, incident flow, UX guard, control room layout, evidence, console sentinel');
     console.log('  machine-readable evidence: artifacts/railwatch-agentic-qa.json');
     console.log('  visual evidence: artifacts/railwatch-agentic-qa.png');
   } finally {
