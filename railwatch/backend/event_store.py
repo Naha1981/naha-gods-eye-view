@@ -65,6 +65,11 @@ class EventStore:
                         install_generic_telemetry(app, manager, store)
                     except Exception as exc:
                         logger.warning("RailWatch generic telemetry adapter unavailable: %s", exc)
+                    try:
+                        from triton_legacy import install as install_triton_legacy
+                        install_triton_legacy(app, manager, store)
+                    except Exception as exc:
+                        logger.warning("RailWatch TRITON legacy adapter unavailable: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive import bootstrap
             logger.warning("RailWatch operations bootstrap registration failed: %s", exc)
 
