@@ -146,6 +146,7 @@
 
     if (incident && classVisible(incident)) {
       incident.classList.add('rw-workspace-active');
+      managedOverlays().forEach(root => { if (root !== incident) setVisible(root, false); });
       document.body.classList.add('rw-workspace-open');
       ensureScrim().classList.add('visible', 'nonblocking');
       syncIncidentTabs('incident');
