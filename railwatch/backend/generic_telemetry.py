@@ -1,9 +1,23 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import Body, Header, HTTPException, Request, status
+
+
+_METADATA_KEYS = {
+    "source",
+    "source_system",
+    "protocol",
+    "protocol_version",
+    "device_id",
+    "source_id",
+    "gateway",
+    "protocol_metadata",
+}
+_METADATA_MAX_BYTES = 12000
 
 
 def _unwrap(body: dict[str, Any]) -> dict[str, Any]:
@@ -24,6 +38,26 @@ def _first(data: dict[str, Any], *keys: str, default: Any = None) -> Any:
         if value not in (None, ""):
             return value
     return default
+
+
+def _bounded_metadata(data: dict[str, Any]) -> dict[str, Any]:
+    candidate = {key: data[key] for key in _METADATA_KEYS if key in data}
+    if not candidate:
+        return {}
+    try:
+        encoded = json.dumps(candidate, ensure_ascii=False, separators=(",", ":"), default=str)
+    except (TypeError, ValueError):
+        return {"metadata_error": "unserializable integration metadata"}
+    if len(encoded.encode("utf-8")) <= _METADATA_MAX_BYTES:
+        return candidate
+    # Preserve the integration identity and discard oversized nested evidence rather
+    # than allowing a malformed/external source to bloat the durable event payload.
+    reduced: dict[str, Any] = {}
+    for key in ("source", "source_system", "protocol", "protocol_version", "device_id", "source_id"):
+        if key in candidate:
+            reduced[key] = str(candidate[key])[:500]
+    reduced["metadata_truncated"] = True
+    return reduced
 
 
 def _coordinates(data: dict[str, Any]) -> tuple[float, float, float]:
@@ -113,6 +147,7 @@ def _build_alert(body: dict[str, Any], main: Any):
         camera_preset=main.CameraPreset(),
         media_url=str(media_url)[:500] if media_url else None,
         incident=incident,
+        integration_metadata=_bounded_metadata(data),
     )
 
 
@@ -148,7 +183,7 @@ def install(app: Any, manager: Any = None, store: Any = None) -> None:
             raise HTTPException(status_code=401, detail="Signed telemetry headers required")
         _verify_signed_request(raw, x_railwatch_client, x_railwatch_timestamp, x_railwatch_nonce, x_railwatch_signature)
         try:
-            body = __import__("json").loads(raw.decode("utf-8"))
+            body = json.loads(raw.decode("utf-8"))
         except Exception as exc:
             raise HTTPException(status_code=422, detail="Telemetry body must be valid JSON") from exc
         if not isinstance(body, dict):
@@ -184,5 +219,5 @@ def install(app: Any, manager: Any = None, store: Any = None) -> None:
                 "x-railwatch-key + optional x-idempotency-key",
                 "HMAC headers for signed-ingest",
             ],
-            "notes": "Adapter normalizes external telemetry into the RailWatch incident contract; authoritative field/GIS integrations remain system-specific.",
+            "notes": "Adapter normalizes external telemetry into the RailWatch incident contract; bounded integration_metadata preserves source/protocol evidence without allowing oversized external payloads.",
         }
