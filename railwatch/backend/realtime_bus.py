@@ -10,7 +10,7 @@ logger = logging.getLogger("railwatch.realtime")
 
 def install(app, manager) -> None:
     url = os.getenv("RAILWATCH_REDIS_URL", "").strip()
-    if not url:
+    if not url or getattr(app.state, "railwatch_realtime_installed", False):
         return
     try:
         import redis.asyncio as redis
@@ -18,10 +18,12 @@ def install(app, manager) -> None:
         logger.warning("Redis dependency unavailable; using local WebSocket broadcast only")
         return
 
+    setattr(app.state, "railwatch_realtime_installed", True)
     client = redis.from_url(url, decode_responses=True, socket_connect_timeout=2)
     channel = os.getenv("RAILWATCH_REDIS_CHANNEL", "railwatch:events")
     instance_id = os.getenv("RENDER_INSTANCE_ID", "local")
-    original = None
+    main = __import__("main")
+    original = main._store_and_broadcast
 
     async def publish(payload: dict) -> None:
         try:
@@ -29,6 +31,16 @@ def install(app, manager) -> None:
             await client.publish(channel, json.dumps(message, separators=(",", ":")))
         except Exception as exc:
             logger.warning("RailWatch Redis publish failed: %s", exc)
+
+    async def wrapped(alert, dedupe_key):
+        result = await original(alert, dedupe_key)
+        if result.get("status") == "accepted":
+            payload = manager.events.get(dedupe_key)
+            if payload:
+                await publish(payload)
+        return result
+
+    main._store_and_broadcast = wrapped
 
     async def subscriber() -> None:
         try:
@@ -49,6 +61,11 @@ def install(app, manager) -> None:
                     while len(manager.events) > int(os.getenv("RAILWATCH_MAX_EVENTS", "2000")):
                         manager.events.pop(next(iter(manager.events)), None)
                     await manager.broadcast(payload)
+                    try:
+                        from operations import register_incident
+                        register_incident(payload, actor="redis", source="redis-event-bus")
+                    except Exception:
+                        pass
                 except Exception as exc:
                     logger.warning("RailWatch Redis message handling failed: %s", exc)
         except asyncio.CancelledError:
@@ -56,26 +73,4 @@ def install(app, manager) -> None:
         except Exception as exc:
             logger.warning("RailWatch Redis subscriber stopped: %s", exc)
 
-    @app.on_event("startup")
-    async def _start_realtime() -> None:
-        nonlocal original
-        original = getattr(__import__("main"), "_store_and_broadcast")
-
-        async def wrapped(alert, dedupe_key):
-            result = await original(alert, dedupe_key)
-            if result.get("status") == "accepted":
-                payload = manager.events.get(dedupe_key)
-                if payload:
-                    await publish(payload)
-            return result
-
-        __import__("main")._store_and_broadcast = wrapped
-        app.state.railwatch_realtime_task = asyncio.create_task(subscriber())
-
-    @app.on_event("shutdown")
-    async def _stop_realtime() -> None:
-        task = getattr(app.state, "railwatch_realtime_task", None)
-        if task:
-            task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
-        await client.aclose()
+    app.state.railwatch_realtime_task = asyncio.create_task(subscriber())
