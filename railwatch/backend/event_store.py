@@ -68,6 +68,23 @@ class EventStore:
             logger.warning("RailWatch PostgreSQL unavailable: %s", exc)
             return False
 
+    def exists(self, dedupe_key: str) -> bool | None:
+        if not self.enabled:
+            return None
+        try:
+            with self._connect() as connection:
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT 1 FROM railwatch_events WHERE dedupe_key = %s LIMIT 1", (dedupe_key,))
+                    exists = cursor.fetchone() is not None
+            self.available = True
+            self.error = None
+            return exists
+        except Exception as exc:  # pragma: no cover - depends on deployment DB
+            self.available = False
+            self.error = str(exc)
+            logger.warning("RailWatch PostgreSQL existence check failed: %s", exc)
+            return None
+
     def insert(self, dedupe_key: str, event_id: str, occurred_at: str, event_hash: str, payload: dict[str, Any]) -> bool | None:
         if not self.enabled:
             return None
