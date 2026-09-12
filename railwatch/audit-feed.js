@@ -21,13 +21,13 @@
     return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
   }
 
-  function add(action, detail, tone = '') {
+  function add(action, detail, tone = '', reveal = false) {
     const key = `${action}|${detail}`;
     if (seen.has(key)) return;
     seen.add(key);
     events.unshift({ action, detail, tone, time: timeNow() });
     if (events.length > 12) events.pop();
-    root.classList.add('visible');
+    if (reveal) root.classList.add('visible');
     render();
   }
 
@@ -41,7 +41,7 @@
 
   document.addEventListener('railwatch:incident', event => {
     const data = event.detail || {};
-    add('INCIDENT DETECTED', `${data.alert_type || 'LINE BREACH'} · ${data.segment || 'Demo sector'} · KM ${Number(data.km_marker || 0).toFixed(1)}`, 'critical');
+    add('INCIDENT DETECTED', `${data.alert_type || 'LINE BREACH'} · ${data.segment || 'Demo sector'} · KM ${Number(data.km_marker || 0).toFixed(1)}`, 'critical', false);
   });
 
   document.addEventListener('railwatch:stage', event => {
@@ -54,24 +54,24 @@
       RESOLVE: 'Response completed · case ready to close',
       PROVE: 'Incident closed · evidence preserved',
     };
-    add(stage, messages[stage] || 'Workflow stage advanced', stage === 'PROVE' ? 'success' : 'info');
+    add(stage, messages[stage] || 'Workflow stage advanced', stage === 'PROVE' ? 'success' : 'info', false);
   });
 
   document.addEventListener('railwatch:audit', event => {
     const action = event.detail?.action;
     const detail = event.detail?.detail;
-    if (action) add(action, detail || 'Operator action recorded', action.includes('SEALED') ? 'success' : 'info');
+    if (action) add(action, detail || 'Operator action recorded', action.includes('SEALED') ? 'success' : 'info', false);
   });
 
   document.addEventListener('click', event => {
     const el = event.target.closest('button, [role="button"]');
     if (!el) return;
-    if (el.matches('[data-action="verify"]')) add('FIELD VERIFICATION', 'Operator marked selected asset for field verification', 'info');
-    if (el.matches('[data-action="cctv"]')) add('CCTV EVIDENCE', 'Operator opened demo CCTV evidence', 'info');
-    if (el.id === 'cctv-verified') add('VISUAL CHECK', 'Operator confirmed demo visual check', 'success');
-    if (el.matches('.dispatch-access-btn')) add('DISPATCH REVIEW', 'Response recommendation opened', 'info');
-    if (el.id === 'dispatch-confirm') add('RESPONSE QUEUED', 'Demo response dispatch recorded locally', 'warning');
-    if (el.id === 'close-incident') add('INCIDENT CLOSED', 'Operator closed the demo incident and preserved evidence', 'success');
-    if (el.id === 'view-report') add('REPORT OPENED', 'Incident evidence report opened in a new tab', 'info');
+    if (el.matches('[data-action="verify"]')) add('FIELD VERIFICATION', 'Operator marked selected asset for field verification', 'info', false);
+    if (el.matches('[data-action="cctv"]')) add('CCTV EVIDENCE', 'Operator opened demo CCTV evidence', 'info', false);
+    if (el.id === 'cctv-verified') add('VISUAL CHECK', 'Operator confirmed demo visual check', 'success', false);
+    if (el.matches('.dispatch-access-btn')) add('DISPATCH REVIEW', 'Response recommendation opened', 'info', false);
+    if (el.id === 'dispatch-confirm') add('RESPONSE QUEUED', 'Demo response dispatch recorded locally', 'warning', false);
+    if (el.id === 'close-incident') add('INCIDENT CLOSED', 'Operator closed the demo incident and preserved evidence', 'success', false);
+    if (el.id === 'view-report') add('REPORT OPENED', 'Incident evidence report opened in a new tab', 'info', false);
   });
 })();
