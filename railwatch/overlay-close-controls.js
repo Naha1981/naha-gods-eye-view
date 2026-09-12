@@ -76,23 +76,21 @@
   function open(type) {
     const target = find(type);
     if (!target) return false;
-    const isIncidentOrCore = type === 'incident' || ['asset', 'dispatch', 'resolution', 'cctv'].includes(type);
-    if (isIncidentOrCore) {
+    const coreWorkflow = ['asset', 'dispatch', 'resolution', 'cctv'].includes(type);
+    if (coreWorkflow) {
       managedOverlays().forEach(root => {
-        if (root === target) return;
         if (root.matches('#incident-popover')) return;
         setVisible(root, false);
       });
     } else {
       managedOverlays().forEach(root => { if (root !== target) setVisible(root, false); });
     }
-    if (type !== 'incident' && !isIncidentOrCore) setVisible(target, true);
-    else target.classList.add('visible', 'rw-workspace-active');
+    target.classList.add('visible', 'rw-workspace-active');
     syncIncidentTabs(type);
     document.body.classList.add('rw-workspace-open');
     const scrim = ensureScrim();
     scrim.classList.add('visible');
-    scrim.classList.toggle('nonblocking', isIncidentOrCore);
+    scrim.classList.toggle('nonblocking', type === 'incident' || coreWorkflow);
     target.dispatchEvent(new CustomEvent('railwatch:workspace-opened', { detail: { type } }));
     if (type === 'incident') target.querySelector('[data-acknowledge-incident], .asset-select, button')?.focus?.({ preventScroll: true });
     return true;
