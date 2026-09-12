@@ -17,7 +17,7 @@ services:
     runtime: python
     rootDir: railwatch/backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main_persistent:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
       - key: RAILWATCH_INGEST_KEY
@@ -45,3 +45,21 @@ services:
           name: naha-railwatch-events
           type: keyvalue
           property: connectionString
+      - key: RAILWATCH_APP_URL
+        sync: false
+      - key: WHATSAPP_OPERATOR_URL
+        value: https://my-own-whatsapp-2z5h.onrender.com
+      - key: WHATSAPP_OPERATOR_API_KEY
+        sync: false
+      - key: WHATSAPP_WEBHOOK_SECRET
+        sync: false
+      - key: WHATSAPP_APP_ID
+        value: railwatch
+      - key: RAILWATCH_WHATSAPP_ENABLED
+        value: "false"
+      - key: RAILWATCH_WHATSAPP_AUTO_ALERTS
+        value: "false"
+      - key: RAILWATCH_WHATSAPP_ALERT_RECIPIENTS
+        sync: false
+      - key: RAILWATCH_WHATSAPP_OPERATORS
+        sync: false
