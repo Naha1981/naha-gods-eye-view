@@ -40,7 +40,11 @@
 
   const stageIndex = { DETECT: 0, LOCATE: 1, VERIFY: 2, RESPOND: 3, RESOLVE: 4, PROVE: 5 };
 
-  function updateStage(stage, allowRegression = false) {
+  function emit(name, detail) {
+    document.dispatchEvent(new CustomEvent(name, { detail }));
+  }
+
+  function updateStage(stage, allowRegression = false, announce = true) {
     if (!(stage in stageIndex)) return;
     if (!allowRegression && stageIndex[stage] < stageIndex[currentStage]) return;
     currentStage = stage;
@@ -49,9 +53,10 @@
       el.classList.toggle('active', i === index);
       el.classList.toggle('complete', i < index);
     });
+    if (announce) emit('railwatch:stage', { stage, source: 'control-room-status' });
   }
 
-  function ingest(data) {
+  function ingest(data, announce = true) {
     const incident = data?.incident;
     if (!incident) return;
     const assetList = Array.isArray(incident.assets) ? incident.assets : [];
@@ -67,11 +72,13 @@
     unresolved.textContent = String(unresolvedCount);
     root.classList.add('has-incident');
     hasActiveIncident = true;
-    updateStage('DETECT');
+    currentStage = 'DETECT';
+    if (announce) emit('railwatch:incident', data);
+    updateStage('DETECT', true, announce);
   }
 
   function setResolutionStage(stage) {
-    updateStage(stage);
+    updateStage(stage, false, false);
     if (stage === 'RESOLVE') status.textContent = 'READY TO CLOSE';
     if (stage === 'PROVE') status.textContent = 'CLOSED · EVIDENCE PRESERVED';
   }
@@ -89,7 +96,7 @@
     }
   }
 
-  document.addEventListener('railwatch:incident', event => ingest(event.detail));
+  document.addEventListener('railwatch:incident', event => ingest(event.detail, false));
   document.addEventListener('railwatch:stage', event => setResolutionStage(event.detail?.stage));
   window.RailWatchControlRoom = { ingest, setResolutionStage };
   hydrateRecentIncident();
