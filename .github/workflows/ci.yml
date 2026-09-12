@@ -51,6 +51,30 @@ jobs:
       - name: Build production bundle
         run: npm run build
 
+  railwatch-backend:
+    name: RailWatch backend contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: railwatch/backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: python -m pip install -r railwatch/backend/requirements.txt
+
+      - name: Run backend contract tests
+        working-directory: railwatch/backend
+        run: python -m unittest discover -s . -p 'test_*.py' -v
+
   railwatch-smoke:
     name: RailWatch operator smoke
     runs-on: ubuntu-latest
