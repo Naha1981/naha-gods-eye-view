@@ -24,6 +24,8 @@ class GenericTelemetryContractTests(unittest.TestCase):
             "device_id": "PLC-17",
             "occurred_at": "2026-09-12T11:00:00Z",
             "description": "External system alarm",
+            "source_system": "DEMO-PLC",
+            "protocol": "TEST-PROTOCOL-1",
         }
         with TestClient(app) as client:
             response = client.post("/api/v1/telemetry/ingest", headers={"x-railwatch-key": "test-ingest"}, json=body)
@@ -37,6 +39,29 @@ class GenericTelemetryContractTests(unittest.TestCase):
             self.assertEqual(event["data"]["severity"], "HIGH")
             self.assertEqual(event["data"]["sensor_id"], "PLC-17")
             self.assertEqual(event["data"]["alert_type"], "TRACK_ALARM")
+            self.assertEqual(event["data"]["integration_metadata"]["source_system"], "DEMO-PLC")
+            self.assertEqual(event["data"]["integration_metadata"]["protocol"], "TEST-PROTOCOL-1")
+
+    def test_bounds_oversized_external_protocol_metadata(self):
+        body = {
+            "id": "EXT-BOUNDED-001",
+            "corridor": "COAL",
+            "section": "Bounded metadata section",
+            "lat": -26.2,
+            "lon": 28.1,
+            "source_system": "DEMO-GATEWAY",
+            "protocol": "TRITON-LEGACY",
+            "device_id": "TRITON-01",
+            "protocol_metadata": {"raw": "X" * 20000},
+        }
+        with TestClient(app) as client:
+            response = client.post("/api/v1/telemetry/ingest", headers={"x-railwatch-key": "test-ingest"}, json=body)
+            self.assertEqual(response.status_code, 202)
+            event = next(item for item in client.get("/api/v1/events").json() if item["data"]["event_id"] == "EXT-BOUNDED-001")
+            metadata = event["data"]["integration_metadata"]
+            self.assertTrue(metadata["metadata_truncated"])
+            self.assertNotIn("protocol_metadata", metadata)
+            self.assertEqual(metadata["protocol"], "TRITON-LEGACY")
 
     def test_requires_authentication(self):
         with TestClient(app) as client:
