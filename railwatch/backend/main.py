@@ -219,6 +219,12 @@ async def restore_events() -> None:
             manager.events[event_id] = payload
 
 
+@app.on_event("startup")
+async def install_whatsapp() -> None:
+    from whatsapp_integration import install
+    install(app, manager, store)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
     return {
