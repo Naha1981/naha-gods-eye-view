@@ -28,6 +28,7 @@
     "test:track": "node scripts/track-regression.mjs",
     "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs",
     "railwatch:smoke": "node scripts/railwatch-smoke.mjs",
+    "railwatch:agentic-qa": "node scripts/railwatch-agentic-qa.mjs",
     "railwatch:monitor": "node scripts/railwatch-monitor.mjs",
     "railwatch:monitor:selftest": "node scripts/railwatch-monitor-selftest.mjs",
     "railwatch:production-smoke": "node scripts/railwatch-production-smoke.mjs",
