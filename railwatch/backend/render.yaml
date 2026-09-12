@@ -1,3 +1,10 @@
+databases:
+  - name: naha-railwatch-db
+    plan: free
+    region: frankfurt
+    databaseName: naha_railwatch_db
+    user: naha_railwatch_db_user
+
 services:
   - type: web
     name: naha-railwatch-api
@@ -14,6 +21,8 @@ services:
       - key: RAILWATCH_ALLOWED_ORIGINS
         sync: false
       - key: DATABASE_URL
-        sync: false
+        fromDatabase:
+          name: naha-railwatch-db
+          property: connectionString
       - key: RAILWATCH_REQUIRE_PERSISTENCE
         value: "true"
