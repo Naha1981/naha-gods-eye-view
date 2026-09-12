@@ -45,9 +45,9 @@
 
   async function getOperatorToken(){
     if(operatorToken) return operatorToken;
-    if(!ingestKey) return '';
     try{
-      const response = await fetch(`${apiBase}/api/v1/auth/demo-token?role=controller&operator=demo-controller`, {method:'POST', headers:{'x-railwatch-key':ingestKey}});
+      const headers = ingestKey ? {'x-railwatch-key': ingestKey} : {};
+      const response = await fetch(`${apiBase}/api/v1/auth/demo-token?role=controller&operator=demo-controller`, {method:'POST', headers});
       if(!response.ok) return '';
       const data = await response.json(); operatorToken = data.token || ''; return operatorToken;
     }catch(e){ return ''; }
@@ -56,7 +56,7 @@
   async function performAction(action){
     if(!current) return;
     const token = await getOperatorToken();
-    if(!token){ $('ops-health').textContent='DEMO KEY NEEDED'; return; }
+    if(!token){ $('ops-health').textContent='DEMO AUTH UNAVAILABLE'; return; }
     try{
       const response = await fetch(`${apiBase}/api/v1/incidents/${encodeURIComponent(current.event_id)}/action`, {method:'POST', headers:{'content-type':'application/json','authorization':`Bearer ${token}`}, body:JSON.stringify({action})});
       if(response.ok){ document.dispatchEvent(new CustomEvent('railwatch:audit',{detail:{action:`OPERATOR_${action}`,event_id:current.event_id,actor:'demo-controller',timestamp:new Date().toISOString()}})); await refreshIncident(); }
