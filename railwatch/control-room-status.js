@@ -44,7 +44,7 @@
     document.dispatchEvent(new CustomEvent(name, { detail }));
   }
 
-  function updateStage(stage, allowRegression = false) {
+  function updateStage(stage, allowRegression = false, announce = true) {
     if (!(stage in stageIndex)) return;
     if (!allowRegression && stageIndex[stage] < stageIndex[currentStage]) return;
     currentStage = stage;
@@ -53,7 +53,7 @@
       el.classList.toggle('active', i === index);
       el.classList.toggle('complete', i < index);
     });
-    emit('railwatch:stage', { stage, source: 'control-room-status' });
+    if (announce) emit('railwatch:stage', { stage, source: 'control-room-status' });
   }
 
   function ingest(data, announce = true) {
@@ -74,11 +74,11 @@
     hasActiveIncident = true;
     currentStage = 'DETECT';
     if (announce) emit('railwatch:incident', data);
-    updateStage('DETECT', true);
+    updateStage('DETECT', true, announce);
   }
 
   function setResolutionStage(stage) {
-    updateStage(stage);
+    updateStage(stage, false, false);
     if (stage === 'RESOLVE') status.textContent = 'READY TO CLOSE';
     if (stage === 'PROVE') status.textContent = 'CLOSED · EVIDENCE PRESERVED';
   }
