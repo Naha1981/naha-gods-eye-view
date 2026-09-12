@@ -15,23 +15,34 @@ def install() -> None:
         return
     operations._INCIDENT_PERSISTENCE_INSTALLED = True
 
+    def ensure_table() -> None:
+        import psycopg
+        with psycopg.connect(database_url, connect_timeout=3) as connection:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    CREATE TABLE IF NOT EXISTS railwatch_incidents (
+                        event_id TEXT PRIMARY KEY,
+                        tenant TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        stage TEXT NOT NULL,
+                        created_at TIMESTAMPTZ NOT NULL,
+                        severity TEXT NOT NULL,
+                        state JSONB NOT NULL,
+                        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+                    )
+                """)
+            connection.commit()
+
+    try:
+        ensure_table()
+    except Exception as exc:
+        logger.warning("RailWatch incident table bootstrap unavailable: %s", exc)
+
     def write(record: dict) -> None:
         try:
             import psycopg
             with psycopg.connect(database_url, connect_timeout=3) as connection:
                 with connection.cursor() as cursor:
-                    cursor.execute("""
-                        CREATE TABLE IF NOT EXISTS railwatch_incidents (
-                            event_id TEXT PRIMARY KEY,
-                            tenant TEXT NOT NULL,
-                            status TEXT NOT NULL,
-                            stage TEXT NOT NULL,
-                            created_at TIMESTAMPTZ NOT NULL,
-                            severity TEXT NOT NULL,
-                            state JSONB NOT NULL,
-                            updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-                        )
-                    """)
                     cursor.execute("""
                         INSERT INTO railwatch_incidents
                         (event_id, tenant, status, stage, created_at, severity, state)
