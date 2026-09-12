@@ -111,6 +111,33 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  railwatch-whatsapp-ux:
+    name: RailWatch WhatsApp workspace UX
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      PUPPETEER_SKIP_DOWNLOAD: '0'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium for WhatsApp workspace QA
+        run: npx puppeteer browsers install chrome
+
+      - name: Run WhatsApp workspace QA
+        run: npm run railwatch:whatsapp-qa
+
   windows-onboarding:
     name: Windows onboarding
     runs-on: windows-latest
