@@ -5,7 +5,7 @@ import binascii
 from datetime import datetime, timezone
 from typing import Any
 
-from fastapi import Body, Header, HTTPException, Request, status
+from fastapi import Body, Header, HTTPException, status
 
 
 # Historical values from the supplied BBC 4204 summary. These are deliberately
@@ -125,7 +125,7 @@ def parse_nmea_body(body: bytes | str) -> dict[str, Any]:
     result: dict[str, Any] = {"sentences": [], "gps": {}}
     for sentence in sentences:
         parsed = parse_rmc(sentence) or parse_gga(sentence) or parse_vtg(sentence)
-        result["sentences"].append({"raw": sentence, "parsed": parsed, "supported": parsed is not None})
+        result["sentences"].append({"raw": sentence[:1000], "parsed": parsed, "supported": parsed is not None})
         if parsed:
             result["gps"].update({k: v for k, v in parsed.items() if k != "sentence_type" and v is not None})
     return result
@@ -159,8 +159,8 @@ def parse_telegram(raw: bytes) -> dict[str, Any]:
         "gateway_message_identifier": gmi,
         "locomotive_number_in_body": gmi == 1,
         "body_length": len(body),
-        "body_text": body.decode("ascii", errors="replace"),
-        "body_hex": body.hex(),
+        "body_text": body.decode("ascii", errors="replace")[:4000],
+        "body_hex": body.hex()[:8000],
         "nmea": parse_nmea_body(body),
     }
 
@@ -254,11 +254,18 @@ def install(app: Any, manager: Any = None, store: Any = None) -> None:
             "source_system": event["source_system"],
             "description": f"Decoded {event['alert_type']} from historical TRITON telegram",
             "protocol": "TRITON-LEGACY",
+            "protocol_metadata": decoded,
+            "gateway": {
+                "ingest": "https",
+                "raw_telegram_base64": base64.b64encode(raw).decode("ascii"),
+            },
         }
         from generic_telemetry import _build_alert
         alert = _build_alert(alert_body, main)
         result = await main._store_and_broadcast(alert, x_idempotency_key or alert.event_id)
-        return {**result, "protocol": "TRITON-LEGACY", "triton": decoded}
+        if result.get("status") == "accepted":
+            result["triton"] = {"message_name": decoded["message_name"], "serial_number": decoded["serial_number"], "sequence_number": decoded["sequence_number"]}
+        return result
 
     @app.post("/api/v1/telemetry/triton/nmea", status_code=status.HTTP_202_ACCEPTED)
     async def triton_nmea_ingest(
@@ -269,42 +276,41 @@ def install(app: Any, manager: Any = None, store: Any = None) -> None:
         import main
 
         main.require_ingest_key(x_railwatch_key)
-        raw_sentence = body.get("nmea")
-        if not isinstance(raw_sentence, str) or not raw_sentence.strip():
-            raise HTTPException(status_code=422, detail="NMEA sentence/body is required")
-        parsed = parse_nmea_body(raw_sentence)
-        gps = parsed.get("gps", {})
+        text = str(body.get("nmea", ""))
+        if not text:
+            raise HTTPException(status_code=422, detail="TRITON NMEA field is required")
+        decoded = parse_nmea_body(text)
+        gps = decoded["gps"]
         if gps.get("latitude") is None or gps.get("longitude") is None:
-            return {"status": "decoded", "ingested": False, "reason": "No supported GPRMC/GPGGA coordinates found", "nmea": parsed}
+            return {"status": "decoded", "ingested": False, "reason": "No supported GPS coordinates in NMEA", "triton": decoded}
         alert_body = {
-            "event_id": str(body.get("event_id") or f"NMEA-{int(datetime.now(timezone.utc).timestamp()*1000)}"),
+            "event_id": str(body.get("event_id") or f"TRITON-NMEA-{int(datetime.now(timezone.utc).timestamp() * 1000)}"),
             "corridor": str(body.get("corridor", "EXTERNAL")),
-            "section": str(body.get("segment", "External NMEA sector")),
+            "section": str(body.get("segment", "External TRITON NMEA sector")),
             "lat": gps["latitude"],
             "lon": gps["longitude"],
-            "type": str(body.get("type", "GPS_POSITION")),
+            "km": body.get("km", 0),
+            "type": str(body.get("alert_type", "GPS_NMEA")),
             "priority": str(body.get("severity", "INFO")),
-            "device_id": str(body.get("device_id", "TRITON-NMEA")),
+            "device_id": str(body.get("sensor_id", "TRITON-NMEA")),
             "occurred_at": gps.get("timestamp") or datetime.now(timezone.utc).isoformat(),
-            "description": "Decoded NMEA telemetry from TRITON-compatible source",
             "source_system": str(body.get("source_system", "TRITON")),
-            "elevation_m": gps.get("altitude_m", 0),
+            "description": "Decoded NMEA telemetry from historical TRITON integration",
+            "protocol": "TRITON-NMEA",
+            "protocol_metadata": decoded,
         }
         from generic_telemetry import _build_alert
         alert = _build_alert(alert_body, main)
-        result = await main._store_and_broadcast(alert, x_idempotency_key or alert.event_id)
-        return {**result, "protocol": "TRITON-LEGACY", "nmea": parsed}
+        return await main._store_and_broadcast(alert, x_idempotency_key or alert.event_id)
 
     @app.get("/api/v1/telemetry/triton/info")
     def triton_info() -> dict[str, Any]:
         return {
-            "status": "decoder-ready",
-            "protocol": "TRITON-LEGACY",
-            "transport_context": ["UDP/IP"],
-            "historical_message_types": {f"0x{k:02X}": v for k, v in MESSAGE_TYPES.items()},
-            "telegram_header_bytes": 10,
-            "crc": "CCITT 0x1021",
-            "supported_payloads": ["GPRMC", "GPGGA", "GPVTG"],
-            "ingest_endpoints": ["/api/v1/telemetry/triton/telegram", "/api/v1/telemetry/triton/nmea"],
-            "deployment_note": "Historical decoder only. Do not connect to Transnet networks or assume historic addresses/ports remain current without written authorization.",
+            "status": "ready",
+            "adapter": "railwatch-triton-legacy-decoder-v1",
+            "historical": True,
+            "message_types": {f"0x{k:02X}": v for k, v in MESSAGE_TYPES.items()},
+            "nmea": ["GPRMC", "GNRMC", "GPGGA", "GNGGA", "GPVTG", "GNVTG"],
+            "crc": "CRC-CCITT polynomial 0x1021; the current decoder interprets the received CRC bytes as little-endian",
+            "network_note": "Historical TRITON addresses/ports are not treated as current connection instructions. Obtain the current interface-control document, approved network path, security requirements and test messages before connecting a live source.",
         }
