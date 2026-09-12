@@ -1,0 +1,80 @@
+name: RailWatch autonomous QA agents
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '18,48 * * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: railwatch-agentic-qa
+  cancel-in-progress: true
+
+jobs:
+  agentic-qa:
+    name: Autonomous RailWatch QA agents
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked dependencies
+        run: npm ci
+
+      - name: Install Chromium for browser agents
+        run: npx puppeteer browsers install chrome
+
+      - name: Run autonomous QA agents
+        run: npm run railwatch:agentic-qa
+
+      - name: Upload autonomous QA evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: railwatch-agentic-qa-evidence
+          path: |
+            artifacts/railwatch-agentic-qa.json
+            artifacts/railwatch-agentic-qa.png
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Raise persistent QA alert on failure
+        if: failure() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="RailWatch autonomous QA alert"
+          BODY="## RailWatch autonomous QA failed\n\n- Workflow: $GITHUB_WORKFLOW\n- Run: https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID\n- Commit: $GITHUB_SHA\n- Time (UTC): $(date -u '+%Y-%m-%d %H:%M:%S')\n\nOne or more automated RailWatch QA agents failed. Download the `railwatch-agentic-qa-evidence` artifact for the machine-readable result and screenshot."
+          EXISTING=$(gh issue list --state open --search "${TITLE} in:title" --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "$TITLE" --body "$BODY"
+          fi
+
+      - name: Close stale QA alert after recovery
+        if: success() && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TITLE="RailWatch autonomous QA alert"
+          EXISTING=$(gh issue list --state open --search "${TITLE} in:title" --json number --jq '.[0].number' || true)
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "✅ Autonomous RailWatch QA recovered on commit $GITHUB_SHA."
+            gh issue close "$EXISTING"
+          fi
