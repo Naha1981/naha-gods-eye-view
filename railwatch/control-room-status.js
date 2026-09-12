@@ -26,7 +26,12 @@
       <div><small>UNRESOLVED</small><strong id="crs-unresolved">0</strong></div>
     </div>
   `;
-  document.body.appendChild(root);
+
+  const header = document.querySelector('.topbar');
+  const connection = header?.querySelector('.status');
+  if (header && connection) header.insertBefore(root, connection);
+  else if (header) header.appendChild(root);
+  else document.body.appendChild(root);
 
   const title = root.querySelector('#crs-title');
   const locationEl = root.querySelector('#crs-location');
