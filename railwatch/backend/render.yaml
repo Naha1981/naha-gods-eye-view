@@ -4,7 +4,7 @@ services:
     runtime: python
     rootDir: railwatch/backend
     buildCommand: pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    startCommand: uvicorn main_persistent:app --host 0.0.0.0 --port $PORT
     healthCheckPath: /healthz
     envVars:
       - key: RAILWATCH_INGEST_KEY
@@ -13,3 +13,7 @@ services:
         sync: false
       - key: RAILWATCH_ALLOWED_ORIGINS
         sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: RAILWATCH_REQUIRE_PERSISTENCE
+        value: "false"
