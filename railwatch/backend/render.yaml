@@ -6,6 +6,12 @@ databases:
     user: naha_railwatch_db_user
 
 services:
+  - type: keyvalue
+    name: naha-railwatch-events
+    plan: free
+    region: frankfurt
+    maxmemoryPolicy: allkeys_lru
+
   - type: web
     name: naha-railwatch-api
     runtime: python
@@ -20,9 +26,22 @@ services:
         sync: false
       - key: RAILWATCH_ALLOWED_ORIGINS
         sync: false
+      - key: RAILWATCH_SIGNING_SECRET
+        generateValue: true
+      - key: RAILWATCH_OPERATOR_SECRET
+        generateValue: true
+      - key: RAILWATCH_DEFAULT_TENANT
+        value: NahaLabs-Demo
+      - key: RAILWATCH_REQUIRE_PERSISTENCE
+        value: "true"
+      - key: RAILWATCH_REQUIRE_AUDIT
+        value: "true"
       - key: DATABASE_URL
         fromDatabase:
           name: naha-railwatch-db
           property: connectionString
-      - key: RAILWATCH_REQUIRE_PERSISTENCE
-        value: "true"
+      - key: RAILWATCH_REDIS_URL
+        fromService:
+          name: naha-railwatch-events
+          type: keyvalue
+          property: connectionString
