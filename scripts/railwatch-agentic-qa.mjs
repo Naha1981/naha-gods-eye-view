@@ -113,6 +113,16 @@ const agents = [
       assert.match(text, /TELECOMMUNICATIONS/i);
       assert.match(text, /Operational impact/i);
       assert.match(text, /Recommended action/i);
+      await page.click('[data-acknowledge-incident]');
+      await page.waitForFunction(() => document.querySelector('.crs-stage[data-stage="LOCATE"]')?.classList.contains('active'), { timeout: 5000 });
+      const operatorButton = await page.$('.asset-operator button[data-action="dispatched"][data-id="DEMO-SIG-0142"]');
+      assert(operatorButton, 'core asset operator dispatch control disappeared after acknowledgement');
+      const hitTested = await page.$eval('.asset-operator button[data-action="dispatched"][data-id="DEMO-SIG-0142"]', button => {
+        const rect = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
+        return hit === button || button.contains(hit);
+      });
+      assert(hitTested, 'core asset operator control is blocked after acknowledgement');
     },
   },
   {
