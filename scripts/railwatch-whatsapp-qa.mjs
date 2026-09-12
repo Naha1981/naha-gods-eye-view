@@ -1,10 +1,9 @@
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { once } from 'node:events';
 import puppeteer from 'puppeteer';
 
 const port = 4176;
-const vite = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'dev', '--', '--host', '127.0.0.1', `--port`, String(port)], {
+const vite = spawn(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['run', 'dev', '--', '--host', '127.0.0.1', '--port', String(port)], {
   stdio: ['ignore', 'pipe', 'pipe'],
   env: { ...process.env, BROWSER: 'none' },
 });
@@ -24,6 +23,7 @@ async function waitFor(url, timeoutMs = 30000) {
   throw new Error(`Timed out waiting for ${url}\n${output}`);
 }
 
+const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
 const overlaps = (a, b, gap = 0) => !(
   a.right + gap <= b.left || a.left - gap >= b.right || a.bottom + gap <= b.top || a.top - gap >= b.bottom
 );
@@ -45,7 +45,7 @@ try {
     ]) {
       await page.setViewport(viewport);
       await page.evaluate(() => window.dispatchEvent(new Event('resize')));
-      await page.waitForTimeout(100);
+      await pause(100);
       const geometry = await page.evaluate(() => {
         const rect = selector => {
           const element = document.querySelector(selector);
@@ -89,7 +89,7 @@ try {
     assert(!overlaps(whatsapp.whatsapp, whatsapp.feed, 8), 'WhatsApp workspace overlaps alert feed');
 
     await page.keyboard.press('Escape');
-    await page.waitForTimeout(50);
+    await pause(50);
     assert.equal(await page.$eval('.whatsapp-panel', element => element.classList.contains('visible')), false, 'WhatsApp workspace did not close with Escape');
     assert.deepEqual(errors, [], `browser errors detected: ${errors.join(' | ')}`);
     console.log('RailWatch WhatsApp browser QA PASS');
