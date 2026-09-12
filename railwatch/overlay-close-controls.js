@@ -3,6 +3,7 @@
     '.audit-feed-panel',
     '.evidence-ledger',
     '.incident-history',
+    '.whatsapp-panel',
   ];
 
   function addClose(root, onClose) {
@@ -63,6 +64,7 @@
     if (type === 'asset') return document.querySelector('.asset-operator');
     if (type === 'dispatch') return document.querySelector('.dispatch-intelligence');
     if (type === 'resolution') return document.querySelector('.resolution-intelligence');
+    if (type === 'whatsapp') return document.querySelector('.whatsapp-panel');
     return null;
   }
 
@@ -125,7 +127,7 @@
   }
 
   function injectBackNav(root) {
-    if (!root || root.matches('#incident-popover') || root.querySelector(':scope > .rw-workspace-back')) return;
+    if (!root || root.matches('#incident-popover') || root.matches('.whatsapp-panel') || root.querySelector(':scope > .rw-workspace-back')) return;
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'rw-workspace-back';
@@ -140,8 +142,10 @@
   function wire() {
     const incident = document.getElementById('incident-popover');
     addClose(incident, close);
+    const whatsapp = document.querySelector('.whatsapp-panel');
+    addClose(whatsapp, close);
     injectIncidentNav(incident);
-    managedOverlays().filter(root => root !== incident).forEach(root => injectBackNav(root));
+    managedOverlays().filter(root => root !== incident && root !== whatsapp).forEach(root => injectBackNav(root));
     ensureScrim();
 
     if (incident && classVisible(incident)) {
@@ -162,7 +166,8 @@
       ensureScrim().classList.remove('nonblocking');
       syncIncidentTabs(
         activeInformation.matches('.audit-feed-panel') ? 'activity' :
-        activeInformation.matches('.evidence-ledger') ? 'ledger' : 'history',
+        activeInformation.matches('.evidence-ledger') ? 'ledger' :
+        activeInformation.matches('.incident-history') ? 'history' : 'incident',
       );
       return;
     }
