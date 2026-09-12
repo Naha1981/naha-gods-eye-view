@@ -60,6 +60,11 @@ class EventStore:
                         install_realtime(app, manager)
                     except Exception as exc:
                         logger.warning("RailWatch realtime bus unavailable: %s", exc)
+                    try:
+                        from generic_telemetry import install as install_generic_telemetry
+                        install_generic_telemetry(app, manager, store)
+                    except Exception as exc:
+                        logger.warning("RailWatch generic telemetry adapter unavailable: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive import bootstrap
             logger.warning("RailWatch operations bootstrap registration failed: %s", exc)
 
@@ -163,7 +168,8 @@ class EventStore:
                         FROM railwatch_events
                         ORDER BY occurred_at DESC, created_at DESC
                         LIMIT %s
-                        """,
+                        """
+                        ,
                         (max(1, min(limit, 500)),),
                     )
                     rows = cursor.fetchall()
