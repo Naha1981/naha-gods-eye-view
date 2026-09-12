@@ -29,6 +29,7 @@
     "qa:map-source-tray": "node scripts/qa-map-source-tray.mjs",
     "railwatch:smoke": "node scripts/railwatch-smoke.mjs",
     "railwatch:agentic-qa": "node scripts/railwatch-workspace-qa.mjs",
+    "railwatch:whatsapp-qa": "node scripts/railwatch-whatsapp-qa.mjs",
     "railwatch:monitor": "node scripts/railwatch-monitor.mjs",
     "railwatch:monitor:selftest": "node scripts/railwatch-monitor-selftest.mjs",
     "railwatch:production-smoke": "node scripts/railwatch-production-smoke.mjs",
@@ -39,7 +40,7 @@
     "cesium": "^1.124.0",
     "egm96-universal": "^1.1.1",
     "mgrs": "^2.1.0",
-    "pbf": "^5.1.2",
+    "pbf": "^5.1.0",
     "satellite.js": "^6.0.2"
   },
   "devDependencies": {
