@@ -56,7 +56,7 @@
     emit('railwatch:stage', { stage, source: 'control-room-status' });
   }
 
-  function ingest(data) {
+  function ingest(data, announce = true) {
     const incident = data?.incident;
     if (!incident) return;
     const assetList = Array.isArray(incident.assets) ? incident.assets : [];
@@ -73,7 +73,7 @@
     root.classList.add('has-incident');
     hasActiveIncident = true;
     currentStage = 'DETECT';
-    emit('railwatch:incident', data);
+    if (announce) emit('railwatch:incident', data);
     updateStage('DETECT', true);
   }
 
@@ -96,7 +96,7 @@
     }
   }
 
-  document.addEventListener('railwatch:incident', event => ingest(event.detail));
+  document.addEventListener('railwatch:incident', event => ingest(event.detail, false));
   document.addEventListener('railwatch:stage', event => setResolutionStage(event.detail?.stage));
   window.RailWatchControlRoom = { ingest, setResolutionStage };
   hydrateRecentIncident();
