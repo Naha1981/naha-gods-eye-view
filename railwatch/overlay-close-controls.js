@@ -111,12 +111,14 @@
       const button = event.target.closest('[data-rw-workspace]');
       if (!button) return;
       event.preventDefault();
+      nav.querySelectorAll('[data-rw-workspace]').forEach(item => item.classList.remove('active'));
+      button.classList.add('active');
       open(button.dataset.rwWorkspace);
     });
   }
 
   function injectBackNav(root) {
-    if (!root || root.matches('#incident-popover') || root.querySelector(':scope > .rw-workspace-back')) return;
+    if (!root || root.matches('#incident-popover') || root.matches('#railwatch-cctv-overlay') || root.querySelector(':scope > .rw-workspace-back')) return;
     const back = document.createElement('button');
     back.type = 'button';
     back.className = 'rw-workspace-back';
@@ -143,7 +145,10 @@
 
     ensureScrim();
     if (incident && classVisible(incident)) {
-      open('incident');
+      if (!incident.classList.contains('rw-workspace-active')) incident.classList.add('rw-workspace-active');
+      allOverlays().forEach(root => { if (root !== incident) setVisible(root, false); });
+      document.body.classList.add('rw-workspace-open');
+      ensureScrim().classList.add('visible');
       return;
     }
 
