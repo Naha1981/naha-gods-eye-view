@@ -73,7 +73,7 @@ jobs:
 
       - name: Run backend contract tests
         working-directory: railwatch/backend
-        run: python -m unittest discover -s . -p 'test_event_store.py' -v
+        run: python -m unittest discover -s . -p 'test_*.py' -v
 
   railwatch-smoke:
     name: RailWatch operator smoke
