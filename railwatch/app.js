@@ -130,6 +130,7 @@ function addAlert(data) {
   });
   addIncidentAssets(data);
   currentIncident = data;
+  document.dispatchEvent(new CustomEvent('railwatch:incident', { detail: data }));
   viewer.camera.flyToBoundingSphere(Cesium.BoundingSphere.fromPoints([hazardPosition, Cesium.Cartesian3.fromDegrees(lon,lat,elevation+20)]), {
     duration: 2, offset: new Cesium.HeadingPitchRange(Cesium.Math.toRadians(data.camera_preset.heading), Cesium.Math.toRadians(data.camera_preset.pitch), Number(data.camera_preset.range_meters || 420))
   });
