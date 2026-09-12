@@ -45,6 +45,16 @@ class EventStore:
                 store = getattr(main_module, "store", None)
                 if manager is not None and store is not None:
                     install(app, manager, store)
+                    try:
+                        from audit_persistence import install as install_audit
+                        install_audit()
+                    except Exception as exc:
+                        logger.warning("RailWatch audit adapter unavailable: %s", exc)
+                    try:
+                        from realtime_bus import install as install_realtime
+                        install_realtime(app, manager)
+                    except Exception as exc:
+                        logger.warning("RailWatch realtime bus unavailable: %s", exc)
         except Exception as exc:  # pragma: no cover - defensive import bootstrap
             logger.warning("RailWatch operations bootstrap registration failed: %s", exc)
 
