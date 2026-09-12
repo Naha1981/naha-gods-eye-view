@@ -22,6 +22,31 @@ class EventStore:
         self.enabled = bool(self.database_url)
         self.available = False
         self.error: str | None = None
+        self._bootstrap_operations()
+
+    @staticmethod
+    def _bootstrap_operations() -> None:
+        # main.py constructs EventStore after creating the FastAPI app but before
+        # defining its startup hook. Registering here keeps the live Render
+        # service compatible with the historical `main:app` start command while
+        # allowing the operations layer to install all new routes before serving.
+        try:
+            import sys
+            main_module = sys.modules.get("main")
+            app = getattr(main_module, "app", None)
+            if app is None or getattr(app, "_railwatch_operations_bootstrap", False):
+                return
+            setattr(app, "_railwatch_operations_bootstrap", True)
+
+            @app.on_event("startup")
+            async def _install_operations() -> None:
+                from operations import install
+                manager = getattr(main_module, "manager", None)
+                store = getattr(main_module, "store", None)
+                if manager is not None and store is not None:
+                    install(app, manager, store)
+        except Exception as exc:  # pragma: no cover - defensive import bootstrap
+            logger.warning("RailWatch operations bootstrap registration failed: %s", exc)
 
     def _connect(self):
         if not self.enabled:
