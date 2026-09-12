@@ -12,6 +12,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException, WebSocket, WebSocke
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, ConfigDict, Field
 
+from event_store import EventStore
+
 
 class Severity(str, Enum):
     INFO = "INFO"
@@ -125,6 +127,7 @@ class ConnectionManager:
 
 
 manager = ConnectionManager()
+store = EventStore()
 
 
 def _safe_equal(provided: str | None, expected: str) -> bool:
@@ -138,17 +141,16 @@ def require_ingest_key(x_railwatch_key: str | None = Header(default=None)) -> No
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Unauthorized")
 
 
-async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> dict[str, Any]:
-    existing = manager.events.get(dedupe_key)
-    if existing:
-        return {"status": "duplicate", "event_id": alert.event_id, "broadcast_connections": 0}
-
-    timestamp = alert.timestamp
+def _normalise_timestamp(value: datetime) -> datetime:
+    timestamp = value
     if timestamp.tzinfo is None:
         timestamp = timestamp.replace(tzinfo=timezone.utc)
-    timestamp = timestamp.astimezone(timezone.utc)
+    return timestamp.astimezone(timezone.utc)
 
-    payload = {
+
+def _build_payload(alert: TelemetryBreachAlert) -> dict[str, Any]:
+    timestamp = _normalise_timestamp(alert.timestamp)
+    return {
         "action": "TRIGGER_ALARM",
         "schema_version": "1.2",
         "data": {
@@ -169,19 +171,50 @@ async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> 
         },
     }
 
+
+async def _store_and_broadcast(alert: TelemetryBreachAlert, dedupe_key: str) -> dict[str, Any]:
+    if manager.events.get(dedupe_key):
+        return {"status": "duplicate", "event_id": alert.event_id, "broadcast_connections": 0}
+
+    durable_existing = store.exists(dedupe_key)
+    if durable_existing is True:
+        return {"status": "duplicate", "event_id": alert.event_id, "broadcast_connections": 0}
+    if durable_existing is None and store.enabled and store.required:
+        raise HTTPException(status_code=503, detail="Durable event store unavailable")
+
+    payload = _build_payload(alert)
+    event_hash = hashlib.sha256(alert.event_id.encode()).hexdigest()
+    timestamp = _normalise_timestamp(alert.timestamp)
+
+    inserted = store.insert(dedupe_key, alert.event_id, timestamp.isoformat(), event_hash, payload)
+    if inserted is False:
+        return {"status": "duplicate", "event_id": alert.event_id, "broadcast_connections": 0}
+    if inserted is None and store.enabled and store.required:
+        raise HTTPException(status_code=503, detail="Durable event store unavailable")
+
     manager.events[dedupe_key] = payload
     while len(manager.events) > MAX_EVENTS:
         oldest = next(iter(manager.events))
         manager.events.pop(oldest, None)
 
     connections = await manager.broadcast(payload)
-    event_hash = hashlib.sha256(alert.event_id.encode()).hexdigest()[:16]
     return {
         "status": "accepted",
         "event_id": alert.event_id,
         "broadcast_connections": connections,
-        "event_fingerprint": event_hash,
+        "event_fingerprint": event_hash[:16],
     }
+
+
+@app.on_event("startup")
+async def restore_events() -> None:
+    ready = store.initialize()
+    if store.enabled and not ready and store.required:
+        raise RuntimeError("RailWatch durable event store is required but unavailable")
+    for payload in store.recent(MAX_EVENTS):
+        event_id = payload.get("data", {}).get("event_id")
+        if event_id:
+            manager.events[event_id] = payload
 
 
 @app.get("/healthz")
@@ -198,7 +231,13 @@ def healthz() -> dict[str, Any]:
             "instance": INSTANCE_ID,
             "started_at": STARTED_AT.isoformat(),
         },
+        "storage": store.health(),
     }
+
+
+@app.get("/api/v1/storage/health")
+def storage_health() -> dict[str, Any]:
+    return store.health()
 
 
 @app.get("/api/v1/events")
