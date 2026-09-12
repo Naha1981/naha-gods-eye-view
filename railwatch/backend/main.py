@@ -99,7 +99,7 @@ app.add_middleware(
     allow_origins=["*"] if ALLOW_ALL_ORIGINS else ALLOWED_ORIGINS,
     allow_credentials=False,
     allow_methods=["GET", "POST"],
-    allow_headers=["content-type", "x-railwatch-key", "x-idempotency-key"],
+    allow_headers=["content-type", "x-railwatch-key", "x-idempotency-key", "authorization"],
 )
 
 
@@ -252,6 +252,15 @@ def storage_health() -> dict[str, Any]:
 def recent_events(limit: int = 100) -> list[dict[str, Any]]:
     limit = max(1, min(limit, 500))
     return list(manager.events.values())[-limit:]
+
+
+@app.get("/api/v1/whatsapp/session")
+def whatsapp_demo_session() -> dict[str, Any]:
+    if not DEMO_MODE:
+        raise HTTPException(status_code=404, detail="Demo UI session disabled")
+    from operations import make_operator_token
+    tenant = os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-Demo")
+    return {"token": make_operator_token("demo-ui", "controller", tenant), "tenant": tenant, "expires_in": 3600}
 
 
 @app.websocket("/ws/v1/c2-stream")
