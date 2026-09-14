@@ -40,6 +40,10 @@ def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _default_tenant() -> str:
+    return os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-RailWatch").strip() or "NahaLabs-RailWatch"
+
+
 def _b64encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode().rstrip("=")
 
@@ -109,12 +113,13 @@ def _incident_record(payload: dict[str, Any]) -> dict[str, Any]:
     except ValueError:
         occurred_at = _utc_now()
     sla = SLA_SECONDS.get(severity, SLA_SECONDS["INFO"])
+    tenant = str(data.get("tenant") or payload.get("tenant") or _default_tenant())
     timeline = [
         {"stage": "DETECT", "action": "SIGNAL_RECEIVED", "timestamp": occurred_at.isoformat(), "actor": "system"},
     ]
     return {
         "event_id": event_id,
-        "tenant": "NahaLabs-Demo",
+        "tenant": tenant,
         "status": "OPEN",
         "stage": "DETECT",
         "created_at": occurred_at.isoformat(),
@@ -140,6 +145,8 @@ def add_action(event_id: str, action: str, actor: str, tenant: str, note: str | 
     incident = _INCIDENTS.get(event_id)
     if not incident:
         raise HTTPException(status_code=404, detail="Incident not found")
+    if incident.get("tenant") != tenant:
+        raise HTTPException(status_code=403, detail="Tenant access denied")
     transition = {
         "ACKNOWLEDGE": "VERIFY",
         "VERIFY": "VERIFY",
@@ -262,7 +269,7 @@ def install(app: Any, manager: Any, store: Any) -> None:
         expected = os.getenv("RAILWATCH_OPERATOR_BOOTSTRAP_KEY") or os.getenv("RAILWATCH_INGEST_KEY", "")
         if not expected or not hmac.compare_digest(x_railwatch_key or "", expected) or role not in ROLES:
             raise HTTPException(status_code=401, detail="Unauthorized")
-        tenant = os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-Demo")
+        tenant = _default_tenant()
         return {"token": make_operator_token(operator, role, tenant), "role": role, "tenant": tenant, "expires_in": 3600}
 
     def current_operator(authorization: str | None) -> dict[str, Any]:
@@ -270,25 +277,29 @@ def install(app: Any, manager: Any, store: Any) -> None:
             raise HTTPException(status_code=401, detail="Unauthorized")
         return parse_operator_token(authorization.split(" ", 1)[1].strip())
 
-    @app.get("/api/v1/incidents/{event_id}/timeline")
-    def incident_timeline(event_id: str) -> dict[str, Any]:
+    def tenant_incident(event_id: str, claims: dict[str, Any]) -> dict[str, Any]:
         incident = _INCIDENTS.get(event_id)
         if not incident:
             raise HTTPException(status_code=404, detail="Incident not found")
+        if incident.get("tenant") != claims["tenant"]:
+            raise HTTPException(status_code=403, detail="Tenant access denied")
         return incident
 
+    @app.get("/api/v1/incidents/{event_id}/timeline")
+    def incident_timeline(event_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        claims = current_operator(authorization)
+        return tenant_incident(event_id, claims)
+
     @app.get("/api/v1/incidents/{event_id}/replay")
-    def incident_replay(event_id: str) -> dict[str, Any]:
-        incident = _INCIDENTS.get(event_id)
-        if not incident:
-            raise HTTPException(status_code=404, detail="Incident not found")
+    def incident_replay(event_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        claims = current_operator(authorization)
+        incident = tenant_incident(event_id, claims)
         return {"event_id": event_id, "mode": "replay", "timeline": incident["timeline"], "rules": incident["rules"], "data_classification": incident["data_classification"]}
 
     @app.get("/api/v1/incidents/{event_id}/sla")
-    def incident_sla(event_id: str) -> dict[str, Any]:
-        incident = _INCIDENTS.get(event_id)
-        if not incident:
-            raise HTTPException(status_code=404, detail="Incident not found")
+    def incident_sla(event_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        claims = current_operator(authorization)
+        incident = tenant_incident(event_id, claims)
         now = time.time()
         return {"event_id": event_id, "status": incident["status"], "stage": incident["stage"], "milestones": {k: {**v, "remaining_seconds": max(0, int(v["due_at"] - now))} for k, v in incident["sla"].items()}}
 
@@ -315,10 +326,9 @@ def install(app: Any, manager: Any, store: Any) -> None:
         return [entry for entry in _AUDIT if entry["tenant"] == tenant][-max(1, min(limit, 500)):]
 
     @app.get("/api/v1/rules/evaluate/{event_id}")
-    def rules(event_id: str) -> dict[str, Any]:
-        incident = _INCIDENTS.get(event_id)
-        if not incident:
-            raise HTTPException(status_code=404, detail="Incident not found")
+    def rules(event_id: str, authorization: str | None = Header(default=None)) -> dict[str, Any]:
+        claims = current_operator(authorization)
+        incident = tenant_incident(event_id, claims)
         return incident["rules"]
 
     @app.get("/api/v1/operations/health")
@@ -336,6 +346,7 @@ def install(app: Any, manager: Any, store: Any) -> None:
                 "replay_protection": True,
                 "rbac": True,
                 "tenant_scoping": True,
+                "tenant_isolation": True,
                 "server_audit": True,
                 "incident_replay": True,
                 "sla_escalation": True,
