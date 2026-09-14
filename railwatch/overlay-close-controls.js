@@ -4,6 +4,7 @@
     '.evidence-ledger',
     '.incident-history',
     '.whatsapp-panel',
+    '.ai-intelligence-panel',
   ];
 
   function addClose(root, onClose) {
@@ -65,6 +66,7 @@
     if (type === 'dispatch') return document.querySelector('.dispatch-intelligence');
     if (type === 'resolution') return document.querySelector('.resolution-intelligence');
     if (type === 'whatsapp') return document.querySelector('.whatsapp-panel');
+    if (type === 'ai') return document.querySelector('.ai-intelligence-panel');
     return null;
   }
 
@@ -113,6 +115,7 @@
         <button type="button" data-rw-workspace="incident" class="active">INCIDENT</button>
         <button type="button" data-rw-workspace="activity">ACTIVITY</button>
         <button type="button" data-rw-workspace="ledger">CASE LEDGER</button>
+        <button type="button" data-rw-workspace="ai">AI INTELLIGENCE</button>
         <button type="button" data-rw-workspace="history">HISTORY</button>
       </div>`;
     const heading = incident.querySelector('h2');
@@ -144,6 +147,8 @@
     addClose(incident, close);
     const whatsapp = document.querySelector('.whatsapp-panel');
     addClose(whatsapp, close);
+    const ai = document.querySelector('.ai-intelligence-panel');
+    addClose(ai, close);
     injectIncidentNav(incident);
     managedOverlays().filter(root => root !== incident && root !== whatsapp).forEach(root => injectBackNav(root));
     ensureScrim();
@@ -167,7 +172,8 @@
       syncIncidentTabs(
         activeInformation.matches('.audit-feed-panel') ? 'activity' :
         activeInformation.matches('.evidence-ledger') ? 'ledger' :
-        activeInformation.matches('.incident-history') ? 'history' : 'incident',
+        activeInformation.matches('.incident-history') ? 'history' :
+        activeInformation.matches('.ai-intelligence-panel') ? 'ai' : 'incident',
       );
       return;
     }
