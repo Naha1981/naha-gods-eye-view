@@ -65,3 +65,11 @@ services:
         sync: false
       - key: RAILWATCH_WHATSAPP_OPERATORS
         sync: false
+      - key: NAHALLM_URL
+        sync: false
+      - key: NAHALLM_API_KEY
+        sync: false
+      - key: NAHALLM_MODEL
+        value: balanced
+      - key: NAHALLM_TIMEOUT_SECONDS
+        value: "20"
