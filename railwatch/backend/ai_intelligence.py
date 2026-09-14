@@ -2,11 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import HTTPException
 
 from nahallm_client import NahaLLMError, chat, extract_text, get_config
-
-router = APIRouter(prefix="/api/v1/ai", tags=["AI intelligence"])
 
 
 def _incident_or_404(manager: Any, event_id: str) -> dict[str, Any]:
@@ -19,7 +17,6 @@ def _incident_or_404(manager: Any, event_id: str) -> dict[str, Any]:
 
 def _context(data: dict[str, Any]) -> str:
     incident = data.get("incident") or {}
-    assets = incident.get("assets") or []
     return str({
         "event_id": data.get("event_id"),
         "severity": data.get("severity"),
@@ -35,8 +32,8 @@ def _context(data: dict[str, Any]) -> str:
             "asset_condition": incident.get("asset_condition"),
             "operational_impact": incident.get("operational_impact"),
             "recommended_action": incident.get("recommended_action"),
+            "assets": incident.get("assets") or [],
         },
-        "nearby_assets": assets,
     })
 
 
@@ -59,50 +56,48 @@ async def _ask(system: str, user: str) -> dict[str, Any]:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@router.get("/status")
-def ai_status() -> dict[str, Any]:
-    config = get_config()
-    return {"configured": config.configured, "model": config.model if config.configured else None}
-
-
-@router.post("/incident/{event_id}/brief")
-async def incident_brief(event_id: str, manager: Any) -> dict[str, Any]:
-    data = _incident_or_404(manager, event_id)
-    system = (
-        "You are RailWatch's operator intelligence assistant. Summarise the incident for a human rail operator. "
-        "Use only supplied facts. Clearly separate observed facts, inferred risk, and unknowns. "
-        "Do not claim authoritative railway data. Do not issue autonomous dispatch or signalling commands. "
-        "Use concise headings: SITUATION, WHY IT MATTERS, UNKNOWN, NEXT HUMAN CHECK."
-    )
-    return {"feature": "incident_brief", "incident_id": event_id, **await _ask(system, f"Incident context:\n{_context(data)}")}
-
-
-@router.post("/incident/{event_id}/challenge")
-async def challenge_decision(event_id: str, manager: Any) -> dict[str, Any]:
-    data = _incident_or_404(manager, event_id)
-    system = (
-        "You are RailWatch's independent challenge analyst. Critically examine the recommended operational response. "
-        "Do not invent evidence. Identify weak assumptions, missing evidence, contradictory signals, and the single most important "
-        "verification question before response. Never override the human operator or issue a control-system command. "
-        "Use headings: DECISION TO CHALLENGE, WHAT SUPPORTS IT, WHAT IS MISSING, CHALLENGE QUESTION, SAFE NEXT STEP."
-    )
-    return {"feature": "decision_challenge", "incident_id": event_id, **await _ask(system, f"Incident context:\n{_context(data)}")}
-
-
-@router.post("/incident/{event_id}/summary")
-async def incident_summary(event_id: str, manager: Any) -> dict[str, Any]:
-    data = _incident_or_404(manager, event_id)
-    system = (
-        "You prepare a professional incident summary for an operations manager. "
-        "Summarise only evidence and actions represented in the supplied incident data. "
-        "Label demo/schematic information as such. Do not fabricate closure, field verification or authoritative evidence. "
-        "Use headings: EXECUTIVE SUMMARY, INCIDENT FACTS, OPERATIONAL IMPACT, RESPONSE STATUS, EVIDENCE GAPS, MANAGEMENT NOTE."
-    )
-    return {"feature": "incident_summary", "incident_id": event_id, **await _ask(system, f"Incident context:\n{_context(data)}")}
-
-
 def install(app: Any, manager: Any) -> None:
-    app.include_router(router, dependencies=[])
-    for route in app.routes:
-        if getattr(route, "path", "") in {"/api/v1/ai/incident/{event_id}/brief", "/api/v1/ai/incident/{event_id}/challenge", "/api/v1/ai/incident/{event_id}/summary"}:
-            route.dependant.path_params["manager"] = manager
+    @app.get("/api/v1/ai/status")
+    def ai_status() -> dict[str, Any]:
+        config = get_config()
+        return {"configured": config.configured, "model": config.model if config.configured else None}
+
+    async def run_feature(event_id: str, feature: str) -> dict[str, Any]:
+        data = _incident_or_404(manager, event_id)
+        prompts: dict[str, tuple[str, str]] = {
+            "brief": (
+                "You are RailWatch's operator intelligence assistant. Summarise the incident for a human rail operator. "
+                "Use only supplied facts. Clearly separate observed facts, inferred risk, and unknowns. "
+                "Do not claim authoritative railway data. Do not issue autonomous dispatch or signalling commands. "
+                "Use concise headings: SITUATION, WHY IT MATTERS, UNKNOWN, NEXT HUMAN CHECK.",
+                "incident_brief",
+            ),
+            "challenge": (
+                "You are RailWatch's independent challenge analyst. Critically examine the recommended operational response. "
+                "Do not invent evidence. Identify weak assumptions, missing evidence, contradictory signals, and the single most important "
+                "verification question before response. Never override the human operator or issue a control-system command. "
+                "Use headings: DECISION TO CHALLENGE, WHAT SUPPORTS IT, WHAT IS MISSING, CHALLENGE QUESTION, SAFE NEXT STEP.",
+                "decision_challenge",
+            ),
+            "summary": (
+                "You prepare a professional incident summary for an operations manager. "
+                "Summarise only evidence and actions represented in the supplied incident data. "
+                "Label demo/schematic information as such. Do not fabricate closure, field verification or authoritative evidence. "
+                "Use headings: EXECUTIVE SUMMARY, INCIDENT FACTS, OPERATIONAL IMPACT, RESPONSE STATUS, EVIDENCE GAPS, MANAGEMENT NOTE.",
+                "incident_summary",
+            ),
+        }
+        system, feature_name = prompts[feature]
+        return {"feature": feature_name, "incident_id": event_id, **await _ask(system, f"Incident context:\n{_context(data)}")}
+
+    @app.post("/api/v1/ai/incident/{event_id}/brief")
+    async def incident_brief(event_id: str) -> dict[str, Any]:
+        return await run_feature(event_id, "brief")
+
+    @app.post("/api/v1/ai/incident/{event_id}/challenge")
+    async def challenge_decision(event_id: str) -> dict[str, Any]:
+        return await run_feature(event_id, "challenge")
+
+    @app.post("/api/v1/ai/incident/{event_id}/summary")
+    async def incident_summary(event_id: str) -> dict[str, Any]:
+        return await run_feature(event_id, "summary")
