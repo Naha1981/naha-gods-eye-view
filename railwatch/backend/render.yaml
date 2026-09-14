@@ -56,7 +56,7 @@ services:
       - key: WHATSAPP_APP_ID
         value: railwatch
       - key: RAILWATCH_WHATSAPP_ENABLED
-        value: "false"
+        value: "true"
       - key: RAILWATCH_WHATSAPP_AUTO_ALERTS
         value: "false"
       - key: RAILWATCH_WHATSAPP_ALERT_RECIPIENTS
