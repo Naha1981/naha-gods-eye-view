@@ -31,7 +31,7 @@ services:
       - key: RAILWATCH_OPERATOR_SECRET
         generateValue: true
       - key: RAILWATCH_DEFAULT_TENANT
-        value: NahaLabs-Demo
+        value: NahaLabs-RailWatch
       - key: RAILWATCH_REQUIRE_PERSISTENCE
         value: "true"
       - key: RAILWATCH_REQUIRE_AUDIT
