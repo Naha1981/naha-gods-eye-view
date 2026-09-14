@@ -30,6 +30,8 @@ services:
         generateValue: true
       - key: RAILWATCH_OPERATOR_SECRET
         generateValue: true
+      - key: RAILWATCH_DEMO_MODE
+        value: "true"
       - key: RAILWATCH_DEFAULT_TENANT
         value: NahaLabs-RailWatch
       - key: RAILWATCH_REQUIRE_PERSISTENCE
