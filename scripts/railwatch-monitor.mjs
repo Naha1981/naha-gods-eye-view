@@ -61,13 +61,12 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       console.log(`  demo_mode: ${body.demo_mode}`);
 
       if (expectedCommit && commit !== expectedCommit) {
-        fail(`deployment drift detected: expected ${expectedCommit}, Render is serving ${commit}`);
+        throw new Error(`deployment drift detected: expected ${expectedCommit}, Render is serving ${commit}`);
       }
       process.exit(0);
     }
   } catch (error) {
-    const detail = error?.name === 'AbortError' ? `timeout after ${timeoutMs}ms` : error?.message || String(error);
-    lastError = `unable to reach ${baseUrl}/healthz · ${detail}`;
+    lastError = error?.message || String(error);
     console.error(`RAILWATCH RETRY ${attempt}/${maxAttempts}: ${lastError}`);
   }
 
