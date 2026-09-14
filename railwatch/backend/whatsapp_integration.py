@@ -140,7 +140,7 @@ class RailWatchWhatsApp:
         }
 
     async def notify_incident(self, event_id: str, tenant: str | None = None) -> dict[str, Any]:
-        tenant = tenant or os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-Demo")
+        tenant = tenant or os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-RailWatch").strip() or "NahaLabs-RailWatch"
         binding = await self._binding(tenant)
         if not binding:
             return {"status": "not_configured", "event_id": event_id, "sent": 0}
@@ -178,7 +178,6 @@ class RailWatchWhatsApp:
         try:
             await operator.send_text(wa_account_id, to, text)
         except WhatsAppOperatorError:
-            # Webhook acknowledgement should remain fast; Operator retry/dead-letter handles transport failures.
             return
 
     def _latest_events(self) -> list[dict[str, Any]]:
