@@ -259,7 +259,7 @@ def whatsapp_demo_session() -> dict[str, Any]:
     if not DEMO_MODE:
         raise HTTPException(status_code=404, detail="Demo UI session disabled")
     from operations import make_operator_token
-    tenant = os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-Demo")
+    tenant = os.getenv("RAILWATCH_DEFAULT_TENANT", "NahaLabs-RailWatch").strip() or "NahaLabs-RailWatch"
     return {"token": make_operator_token("demo-ui", "controller", tenant), "tenant": tenant, "expires_in": 3600}
 
 
