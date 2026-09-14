@@ -225,6 +225,12 @@ async def install_whatsapp() -> None:
     install(app, manager, store)
 
 
+@app.on_event("startup")
+async def install_ai_intelligence() -> None:
+    from ai_intelligence import install
+    install(app, manager)
+
+
 @app.get("/healthz")
 def healthz() -> dict[str, Any]:
     return {
